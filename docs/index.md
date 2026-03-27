@@ -5,7 +5,7 @@ nav_order: 1
 description: "Main entry point for documentation."
 ---
 
-# Project Name: mechatracker
+# mechatracker
 
 Welcome to the official documentation for **mechatracker**. This site provides a comprehensive guide to the system's design, codebase, and deployment processes.
 
