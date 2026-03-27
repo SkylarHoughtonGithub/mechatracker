@@ -1,0 +1,13 @@
+---
+---
+
+// Just define the variables here. 
+// The theme will automatically use these to override the defaults.
+
+$body-background-color: #1d1f21; // Dark slate background
+$sidebar-color: #25282e;        // Slightly lighter sidebar
+$link-color: #70ad26;           // Slate green
+$nav-child-link-color: #70ad26;
+
+// If you want to add custom CSS rules, add them below the variables
+@import "just-the-docs";

@@ -86,5 +86,3 @@ Googles auth service
 
 ## Decision
 Clerk has the most out of box considerations. Organization API, clean Go integration. Need to consider migratrion when usage becomes high with the cost expected, but is a good problem to have at that phase
-
-{% include architecture_back_nav.html %}
