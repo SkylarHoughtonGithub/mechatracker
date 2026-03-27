@@ -4,7 +4,7 @@ description: Technical Documentation
 
 # This makes the theme work correctly on GitHub Pages
 url: "https://skylarhoughtongithub.github.io"
-baseurl: "/ymechatracker" 
+baseurl: "/mechatracker" 
 
 # Color Scheme: Use 'dark' to get closer to the Slate look
 color_scheme: dark
