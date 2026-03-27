@@ -14,9 +14,3 @@ Detailed insights into how the system is built and how components interact.
 
 ## 📖 Getting Started
 Resources to help you get the project running locally.
-
-* [Installation Guide](setup.md)
-* [Configuration Options](config.md)
-
----
-*Maintained by SkylarHoughtonGithub. View the source on [GitHub](https://github.com/SkylarHoughtonGithub/mechatracker).*
