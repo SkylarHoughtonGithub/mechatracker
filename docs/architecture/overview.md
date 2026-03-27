@@ -5,4 +5,4 @@ title: Architecture Overview
 
 # Architecture Documentation
 
-* [Auth Decision](./architecture/auth.md)
+* [Auth Decision](./auth.md)
