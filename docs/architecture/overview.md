@@ -8,12 +8,12 @@ title: Architecture Overview
 Below is an automatically generated list of all architectural documents:
 
 <ul>
-  {% for file in site.static_files %}
-    {% if file.path contains '/docs/architecture/' and file.extname == '.md' %}
-      {% unless file.path contains 'overview.md' %}
+  {% for p in site.pages %}
+    {% if p.path contains 'docs/architecture/' %}
+      {% unless p.url == page.url %}
         <li>
-          <a href="{{ file.path | relative_url }}">
-            {{ file.basename | capitalize | replace: "-", " " }}
+          <a href="{{ p.url | relative_url }}">
+            {{ p.title | default: p.basename }}
           </a>
         </li>
       {% endunless %}
