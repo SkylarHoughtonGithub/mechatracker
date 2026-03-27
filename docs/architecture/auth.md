@@ -1,6 +1,7 @@
 ---
 layout: default
 title: Auth Architecture
+parent: Architecture
 ---
 
 # Auth Decision

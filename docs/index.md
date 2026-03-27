@@ -1,6 +1,8 @@
 ---
 layout: default
-title: Project Documentation
+title: Home
+nav_order: 1
+description: "Main entry point for documentation."
 ---
 
 # Project Name: mechatracker
