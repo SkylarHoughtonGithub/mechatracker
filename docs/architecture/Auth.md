@@ -35,4 +35,18 @@ Hosted Auth with built-in UI components
 - Expensive at scale ($25/mo per 1k MAU over free tier)
 - Vendor lock-in
 
-{% include architecture_back_nav.html %}
+
+### Supabase
+
+Auth bundled with Postgres + storage
+
+#### Pros
+- Go Support
+- Official React SDK
+- Free Tier (50k MAU)
+- Self-hostable
+
+#### Cons
+- Uses Supabase postgres - conflicts with running your own Go-managed DB
+- No native organizations/team concepts
+- Ecosystem lockin
