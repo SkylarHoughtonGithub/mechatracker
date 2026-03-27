@@ -76,7 +76,7 @@ Googles auth service
 - No per user pricing at scale
 - Self hostable
 
-#### 
+#### Cons
 - Lots of overhead
 - Security surface in house
 - Password reset, MFA, social login from scratch
