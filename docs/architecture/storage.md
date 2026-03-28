@@ -4,9 +4,7 @@ title: Storage Architecture
 parent: Architecture
 ---
 
-# Storage Architecture
-
-## What we need to store
+## Storage Requirements
 
 Object storage should work for all application needs
 
