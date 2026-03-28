@@ -3,9 +3,8 @@ layout: default
 title: Auth Architecture
 parent: Architecture
 ---
-# PartTrack — Auth Decision
 
-## What we need from auth
+## Auth Requirements
 
 | Requirement | Notes |
 |---|---|
