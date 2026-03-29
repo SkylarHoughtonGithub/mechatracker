@@ -1,0 +1,68 @@
+# values.dev.yaml — local developer workstation overrides.
+
+# ── API ───────────────────────────────────────────────────────────────────────
+api:
+  replicaCount: 1
+  image:
+    repository: mechatracker-registry:5050/mechatracker/api
+    tag: latest
+    pullPolicy: Always
+
+  env:
+    ENV: development
+    PORT: "8080"
+    DATABASE_URL: "postgres://mechatracker:mechatracker@mechatracker-postgresql:5432/mechatracker?sslmode=disable"
+    CLERK_DEV_BYPASS: "true"
+    CLERK_JWKS_URL: "http://unused-in-dev"
+    CLERK_AUDIENCE: "dev"
+    SPACES_ENDPOINT: ""
+    SPACES_BUCKET: ""
+    SPACES_ACCESS_KEY: ""
+    SPACES_SECRET_KEY: ""
+    SENTRY_DSN: ""
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: true
+    className: traefik
+    annotations: {}
+    hosts:
+      - host: localhost
+        paths:
+          - path: /
+            pathType: Prefix
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Uses the official postgres image — no Bitnami dependency.
+postgresql:
+  enabled: true
+
+  image:
+    tag: "17"
+
+  auth:
+    username: mechatracker
+    password: mechatracker
+    database: mechatracker
+
+  persistence:
+    size: 2Gi
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

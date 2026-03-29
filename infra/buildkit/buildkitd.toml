@@ -1,0 +1,5 @@
+# buildkitd.toml — buildx daemon config for local dev.
+# Marks the local k3d registry as insecure (plain HTTP).
+[registry."localhost:5050"]
+  http = true
+  insecure = true

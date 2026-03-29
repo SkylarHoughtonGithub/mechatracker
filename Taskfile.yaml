@@ -1,0 +1,254 @@
+version: '3'
+
+vars:
+  CLUSTER_NAME: mechatracker
+  REGISTRY_NAME: mechatracker-registry
+  REGISTRY_PORT: 5050
+  K8S_NAMESPACE: mechatracker-dev
+  # localhost:5050 works for kubectl/helm (host network)
+  # k3d-<name>:5050 is what buildx needs (container-to-container)
+  # Address used by buildx to push (host network, localhost resolves correctly)
+  API_IMAGE_PUSH: localhost:{{.REGISTRY_PORT}}/mechatracker/api
+  # Address used by k3d nodes to pull (registry name without k3d- prefix when created via config)
+  API_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/api
+
+tasks:
+  default:
+    silent: true
+    cmds:
+      - task --list
+
+  # ── Setup ────────────────────────────────────────────────────────────────────
+
+  setup:
+    desc: "Full one-time setup: tools → env → cluster → helm"
+    cmds:
+      - task: setup:tools
+      - task: setup:env
+      - task: setup:buildx
+      - task: setup:cluster
+      - task: setup:helm
+
+  setup:tools:
+    desc: "Install all dev dependencies via Homebrew and go install"
+    cmds:
+      - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx
+      - go install github.com/vektra/mockery/v2@latest
+      - npm install -g openapi-typescript
+
+  setup:env:
+    desc: "Copy api/.env.example → api/.env if it does not exist"
+    status:
+      - test -f api/.env
+    cmds:
+      - cp api/.env.example api/.env
+      - echo "api/.env created — dev defaults work out of the box"
+
+  setup:buildx:
+    desc: "Link buildx plugin and create a multi-platform builder"
+    status:
+      - docker buildx inspect mechatracker
+    cmds:
+      - mkdir -p ~/.docker/cli-plugins
+      - ln -sf $(brew --prefix docker-buildx)/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+      - |
+        docker buildx create \
+          --name=mechatracker \
+          --driver=docker-container \
+          --driver-opt=network=host \
+          --config={{.ROOT_DIR}}/infra/buildkit/buildkitd.toml \
+          --bootstrap \
+          --use
+
+  setup:cluster:
+    desc: "Create the k3d cluster and local image registry"
+    status:
+      - k3d cluster get {{.CLUSTER_NAME}}
+    cmds:
+      - k3d cluster create --config ./infra/k3d/config.yaml --wait
+      - kubectl create namespace {{.K8S_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
+
+  setup:helm:
+    desc: "Add Helm repos (no chart dependencies currently)"
+    cmds:
+      - helm repo update || true
+
+  # ── Dev ──────────────────────────────────────────────────────────────────────
+
+  dev:
+    desc: "Build, deploy, and migrate — the main inner loop"
+    cmds:
+      - task: api:image:push
+      - task: helm:upgrade
+      - task: db:wait
+      - echo "✓  http://localhost:8080"
+      - echo "   Run 'task db:forward' then 'task db:migrate' to apply migrations"
+
+  dev:logs:
+    desc: "Tail API pod logs"
+    cmds:
+      - kubectl logs -n {{.K8S_NAMESPACE}} -l app=mechatracker-api -f
+
+  dev:restart:
+    desc: "Restart the API pod (e.g. after a config change)"
+    cmds:
+      - kubectl rollout restart deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+      - kubectl rollout status deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+
+  dev:status:
+    desc: "Show cluster nodes and pod status"
+    cmds:
+      - kubectl get nodes
+      - kubectl get pods -n {{.K8S_NAMESPACE}}
+
+  # ── API ──────────────────────────────────────────────────────────────────────
+
+  api:run:
+    desc: "Run the API process locally (run task db:forward first)"
+    dir: api
+    cmds:
+      - go run ./cmd/api
+
+  api:test:
+    desc: "Run Go tests"
+    dir: api
+    cmds:
+      - go test ./...
+
+  api:image:push:
+    desc: "Build and push the API image to the local k3d registry"
+    dir: api
+    vars:
+      PLATFORMS: '{{.PLATFORMS | default "linux/arm64"}}'
+    cmds:
+      - go mod tidy
+      - |
+        docker buildx build \
+          --platform {{.PLATFORMS}} \
+          --tag {{.API_IMAGE_PUSH}}:latest \
+          --push \
+          .
+
+  # ── Helm ─────────────────────────────────────────────────────────────────────
+
+  helm:upgrade:
+    desc: "Install or upgrade the Helm release"
+    cmds:
+      - |
+        helm upgrade --install mechatracker ./infra/helm/mechatracker \
+          --namespace {{.K8S_NAMESPACE}} \
+          --values ./infra/helm/mechatracker/values.dev.yaml \
+          --wait --timeout 5m
+
+  helm:uninstall:
+    desc: "Uninstall the Helm release (keeps the cluster)"
+    cmds:
+      - helm uninstall mechatracker --namespace {{.K8S_NAMESPACE}}
+
+  # ── Database ─────────────────────────────────────────────────────────────────
+
+  db:wait:
+    desc: "Wait for Postgres to be ready"
+    cmds:
+      - |
+        echo "Waiting for Postgres..."
+        for i in $(seq 1 30); do
+          if kubectl exec -n {{.K8S_NAMESPACE}} \
+               statefulset/mechatracker-postgresql -- \
+               pg_isready -U mechatracker &>/dev/null; then
+            echo "✓ Postgres ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "✗ Postgres timed out"; exit 1
+
+  db:migrate:
+    desc: "Run pending migrations (port-forward must be running, or use db:migrate:cluster)"
+    dir: api
+    dotenv: ['.env']
+    cmds:
+      - migrate -path ./migrations -database "$DATABASE_URL" up
+
+  db:migrate:cluster:
+    desc: "Run migrations via kubectl exec (no port-forward needed)"
+    cmds:
+      - |
+        kubectl cp api/migrations mechatracker-postgresql-0:/tmp/migrations -n {{.K8S_NAMESPACE}}
+        kubectl exec -n {{.K8S_NAMESPACE}} statefulset/mechatracker-postgresql -- \
+          sh -c 'migrate -path /tmp/migrations -database "postgres://mechatracker:mechatracker@localhost:5432/mechatracker?sslmode=disable" up' 2>/dev/null \
+          || echo "migrate not in container — run: task db:forward then task db:migrate"
+
+  db:new:
+    desc: "Create a new migration  (NAME=add_something)"
+    dir: api
+    cmds:
+      - migrate create -ext sql -dir ./migrations -seq {{.NAME}}
+
+  db:reset:
+    desc: "Drop and re-run all migrations"
+    prompt: "This destroys all local DB data. Continue?"
+    dir: api
+    dotenv: ['.env']
+    cmds:
+      - migrate -path ./migrations -database "$DATABASE_URL" drop -f
+      - migrate -path ./migrations -database "$DATABASE_URL" up
+
+  db:shell:
+    desc: "Open a psql shell into the in-cluster Postgres"
+    cmds:
+      - |
+        kubectl exec -it -n {{.K8S_NAMESPACE}} \
+          statefulset/mechatracker-postgresql -- \
+          psql -U mechatracker -d mechatracker
+
+  db:forward:
+    desc: "Port-forward Postgres to localhost:5432 (needed for task api:run)"
+    cmds:
+      - kubectl port-forward -n {{.K8S_NAMESPACE}} svc/mechatracker-postgresql 5432:5432
+
+  # ── Code generation ──────────────────────────────────────────────────────────
+
+  generate:
+    desc: "Regenerate all generated files"
+    cmds:
+      - task: generate:sqlc
+      - task: generate:mocks
+      - task: generate:openapi
+      - task: generate:ts
+
+  generate:sqlc:
+    dir: api
+    cmds: [sqlc generate]
+
+  generate:mocks:
+    dir: api
+    cmds: [mockery]
+
+  generate:openapi:
+    dir: api
+    cmds: [swag init -g cmd/api/main.go -o openapi/]
+
+  generate:ts:
+    cmds: [npx openapi-typescript api/openapi/openapi.yaml -o shared/types/index.ts]
+
+  # ── Cluster lifecycle ────────────────────────────────────────────────────────
+
+  cluster:delete:
+    desc: "Tear down the cluster and registry"
+    prompt: "This destroys the local cluster and all data. Continue?"
+    cmds:
+      - k3d cluster delete {{.CLUSTER_NAME}}
+      - k3d registry delete k3d-{{.REGISTRY_NAME}} || true
+
+  # ── Infrastructure ───────────────────────────────────────────────────────────
+
+  infra:plan:
+    desc: "Preview Terraform changes"
+    dir: infra/terraform
+    cmds: [terraform plan]
+
+  infra:apply:
+    desc: "Apply Terraform changes"
+    dir: infra/terraform
+    cmds: [terraform apply]

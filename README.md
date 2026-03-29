@@ -1,1 +1,132 @@
 # mechatracker
+
+A repair tracking platform for mechanics, auto shops, and fleet managers. Search for repair resources across multiple sources, build recipe-style repair cards with parts and tools checklists, and track repairs from first wrench turn to completion — with full history per vehicle.
+
+---
+
+## What it does
+
+- **Garage** — save vehicles by year, make, model, and trim. Drill down from vehicle → system → repair type.
+- **Repair cards** — recipe-style profiles listing required parts, tools, torque specs, and step-by-step procedures. Seeded from global templates, customizable per org.
+- **Resource aggregation** — search YouTube tutorials, web forums, uploaded PDF manuals, and parts pricing in one place. Attach any result directly to a repair.
+- **Repair tracking** — log step completions, add timestamped notes, attach photos at the repair or step level. Track parts status from needed → ordered → installed.
+- **History** — completed repairs are archived as immutable snapshots per vehicle. Full cost and time history retained indefinitely.
+- **Multi-user** — solo mechanics, shop teams, and fleet operations all use the same model. Users belong to an org; shops and fleets have multiple users with role-based access.
+
+---
+
+## Tech stack
+
+### Frontend
+| Layer | Technology |
+|---|---|
+| Web | Next.js (React, TypeScript) |
+| Mobile | React Native + Expo |
+| Shared types & API client | Generated from OpenAPI spec via `openapi-typescript` |
+
+### Backend
+| Layer | Technology |
+|---|---|
+| API server | Go |
+| Background workers | Go (separate binary) |
+| Database | PostgreSQL |
+| DB query layer | sqlc (generated, type-safe) |
+| Migrations | golang-migrate |
+| Auth | Clerk (JWT verified in Go middleware) |
+
+### Infrastructure
+| Layer | Technology |
+|---|---|
+| Compute | DigitalOcean Droplets (Docker) |
+| Database | DigitalOcean Managed PostgreSQL |
+| File storage | DigitalOcean Spaces (S3-compatible) |
+| Container registry | DigitalOcean Container Registry (DOCR) |
+| IaC | Terraform (DigitalOcean provider) |
+| CI/CD | GitHub Actions |
+| Mobile builds | Expo EAS Build + EAS Submit |
+
+### Observability
+| Layer | Technology |
+|---|---|
+| Error tracking | Sentry (API, web, mobile — separate integrations) |
+| Push notifications | Expo Push → APNs (iOS) + FCM (Android) |
+
+---
+
+## Repo structure
+
+```
+mechatracker/
+├── api/          # Go API and background worker
+├── web/          # Next.js web app
+├── mobile/       # React Native + Expo mobile app
+├── shared/       # Generated TypeScript types and API client
+├── infra/        # Terraform and deploy scripts
+├── docs/         # Architecture decisions
+├── docker-compose.yml   # Local development stack
+├── Taskfile.yml         # Developer commands
+└── package.json         # npm workspaces root (web, mobile, shared)
+```
+
+See [`docs/decisions/repo.md`](docs/decisions/repo.md) for the full layout.
+
+---
+
+## Code generation
+
+Several parts of the codebase are generated from source definitions and should not be hand-edited.
+
+| Generator | Source | Output |
+|---|---|---|
+| sqlc | `api/queries/*.sql` | `api/internal/store/` |
+| swaggo | Go handler annotations | `api/openapi/openapi.yaml` |
+| openapi-typescript | `api/openapi/openapi.yaml` | `shared/types/` + `shared/client/` |
+| mockery | Go interfaces | `api/mocks/` |
+
+Run `task generate` to regenerate everything. CI validates generated files are up to date on every PR.
+
+---
+
+## Getting started
+
+```sh
+# Install tools
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+go install github.com/vektra/mockery/v2@latest
+npm install -g @go-task/cli
+
+# Install JS dependencies
+npm install
+
+# Copy environment config
+cp .env.example .env
+
+# Start local stack (API + Postgres + web)
+task dev
+```
+
+---
+
+## Key commands
+
+```sh
+task dev                              # start full local stack
+task generate                         # regenerate all generated files
+task api:test                         # run Go tests
+task db:new NAME=add_something        # create a new migration
+task infra:plan                       # preview infrastructure changes
+```
+
+---
+
+## Decisions log
+
+Infrastructure and architecture decisions are documented in [`docs/decisions/`](docs/decisions/).
+
+| Decision | Status | Doc |
+|---|---|---|
+| Auth provider | Clerk | [auth.md](docs/decisions/auth.md) |
+| File storage | DigitalOcean Spaces | [storage.md](docs/decisions/storage.md) |
+| Hosting | DigitalOcean Droplets + Docker | [hosting.md](docs/decisions/hosting.md) |
+| Repo structure | Monorepo — Go + Next.js + Expo | [repo.md](docs/decisions/repo.md) |
+| Data model | PostgreSQL schema | [datamodel.md](docs/decisions/datamodel.md) |
