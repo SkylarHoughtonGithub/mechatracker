@@ -1,0 +1,30 @@
+# values.yaml — production-oriented defaults.
+# All secrets come from external secret management (e.g. DO Secrets, K8s Secrets).
+# Override with values.dev.yaml locally, values.staging.yaml in CI, etc.
+
+api:
+  replicaCount: 2
+  image:
+    repository: registry.digitalocean.com/mechatracker/api
+    tag: ""         # set by CI at deploy time
+    pullPolicy: IfNotPresent
+
+  env: {}           # populated via K8s Secret in production
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  ingress:
+    enabled: false  # enabled in prod values; managed by Terraform/CI
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+postgresql:
+  enabled: false    # prod uses DigitalOcean Managed PostgreSQL
