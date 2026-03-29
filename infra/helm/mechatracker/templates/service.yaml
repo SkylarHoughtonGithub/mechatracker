@@ -26,6 +26,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 spec:
+  ingressClassName: {{ .Values.api.ingress.className }}
   rules:
     {{- range .Values.api.ingress.hosts }}
     - host: {{ .host }}

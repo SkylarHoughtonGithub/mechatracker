@@ -4,9 +4,3 @@ description: mechatracker local dev stack — API + dependencies
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-
-dependencies:
-  - name: postgresql
-    version: "15.5.x"   # pin minor, allow patch updates
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql.enabled

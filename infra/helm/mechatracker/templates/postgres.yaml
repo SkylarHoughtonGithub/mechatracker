@@ -1,0 +1,71 @@
+# Postgres StatefulSet using the official postgres image.
+# Intentionally simple — this is a dev-only database, not a production HA setup.
+{{- if .Values.postgresql.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mechatracker.fullname" . }}-postgresql
+  labels:
+    {{- include "mechatracker.labels" . | nindent 4 }}
+    app: mechatracker-postgresql
+spec:
+  serviceName: {{ include "mechatracker.fullname" . }}-postgresql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mechatracker-postgresql
+  template:
+    metadata:
+      labels:
+        app: mechatracker-postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: "postgres:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: tcp-postgresql
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: {{ .Values.postgresql.auth.username }}
+            - name: POSTGRES_PASSWORD
+              value: {{ .Values.postgresql.auth.password }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.auth.database }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, {{ .Values.postgresql.auth.username }}]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.postgresql.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.persistence.size }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mechatracker.fullname" . }}-postgresql
+  labels:
+    {{- include "mechatracker.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: tcp-postgresql
+      port: 5432
+      targetPort: tcp-postgresql
+  selector:
+    app: mechatracker-postgresql
+{{- end }}

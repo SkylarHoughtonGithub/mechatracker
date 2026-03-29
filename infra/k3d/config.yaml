@@ -1,0 +1,22 @@
+# infra/k3d/config.yaml — k3d cluster config.
+# Wires the local registry into the cluster so pods can pull from it.
+# Used by `task setup:cluster` instead of inline CLI flags.
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+
+metadata:
+  name: mechatracker
+
+servers: 1
+agents: 1
+
+ports:
+  - port: 8080:80
+    nodeFilters:
+      - loadbalancer
+
+registries:
+  create:
+    name: mechatracker-registry
+    host: "0.0.0.0"
+    hostPort: "5050"

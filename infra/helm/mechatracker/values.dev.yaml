@@ -1,36 +1,24 @@
 # values.dev.yaml — local developer workstation overrides.
-# Never commit real secrets here; this file is .gitignore-safe because all
-# values are either fake or meaningless outside localhost.
 
 # ── API ───────────────────────────────────────────────────────────────────────
 api:
   replicaCount: 1
   image:
-    repository: localhost:5050/mechatracker/api
+    repository: mechatracker-registry:5050/mechatracker/api
     tag: latest
     pullPolicy: Always
 
   env:
     ENV: development
     PORT: "8080"
-
-    # Postgres — matches the postgresql subchart credentials below.
     DATABASE_URL: "postgres://mechatracker:mechatracker@mechatracker-postgresql:5432/mechatracker?sslmode=disable"
-
-    # Auth — DEV BYPASS.
-    # Setting CLERK_DEV_BYPASS=true makes the auth middleware skip JWT
-    # verification and inject a synthetic user_id for local testing.
-    # This env var is checked in the middleware; never set it in staging/prod.
     CLERK_DEV_BYPASS: "true"
     CLERK_JWKS_URL: "http://unused-in-dev"
     CLERK_AUDIENCE: "dev"
-
-    # Storage — not wired up yet; safe to leave blank.
     SPACES_ENDPOINT: ""
     SPACES_BUCKET: ""
     SPACES_ACCESS_KEY: ""
     SPACES_SECRET_KEY: ""
-
     SENTRY_DSN: ""
 
   service:
@@ -39,8 +27,8 @@ api:
 
   ingress:
     enabled: true
-    annotations:
-      kubernetes.io/ingress.class: traefik   # k3d ships traefik by default
+    className: traefik
+    annotations: {}
     hosts:
       - host: localhost
         paths:
@@ -55,24 +43,26 @@ api:
       cpu: 500m
       memory: 256Mi
 
-# ── PostgreSQL (Bitnami subchart) ─────────────────────────────────────────────
+# ── PostgreSQL ────────────────────────────────────────────────────────────────
+# Uses the official postgres image — no Bitnami dependency.
 postgresql:
   enabled: true
+
+  image:
+    tag: "17"
 
   auth:
     username: mechatracker
     password: mechatracker
     database: mechatracker
 
-  primary:
-    persistence:
-      enabled: true
-      size: 2Gi   # small — just dev data
+  persistence:
+    size: 2Gi
 
-    resources:
-      requests:
-        cpu: 100m
-        memory: 256Mi
-      limits:
-        cpu: 500m
-        memory: 512Mi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

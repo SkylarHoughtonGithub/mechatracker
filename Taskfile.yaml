@@ -5,7 +5,12 @@ vars:
   REGISTRY_NAME: mechatracker-registry
   REGISTRY_PORT: 5050
   K8S_NAMESPACE: mechatracker-dev
-  API_IMAGE: localhost:{{.REGISTRY_PORT}}/mechatracker/api
+  # localhost:5050 works for kubectl/helm (host network)
+  # k3d-<name>:5050 is what buildx needs (container-to-container)
+  # Address used by buildx to push (host network, localhost resolves correctly)
+  API_IMAGE_PUSH: localhost:{{.REGISTRY_PORT}}/mechatracker/api
+  # Address used by k3d nodes to pull (registry name without k3d- prefix when created via config)
+  API_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/api
 
 tasks:
   default:
@@ -40,32 +45,33 @@ tasks:
       - echo "api/.env created — dev defaults work out of the box"
 
   setup:buildx:
-    desc: "Create a multi-platform buildx builder"
+    desc: "Link buildx plugin and create a multi-platform builder"
     status:
       - docker buildx inspect mechatracker
     cmds:
-      - docker buildx create --name mechatracker --driver docker-container --bootstrap --use
+      - mkdir -p ~/.docker/cli-plugins
+      - ln -sf $(brew --prefix docker-buildx)/bin/docker-buildx ~/.docker/cli-plugins/docker-buildx
+      - |
+        docker buildx create \
+          --name=mechatracker \
+          --driver=docker-container \
+          --driver-opt=network=host \
+          --config={{.ROOT_DIR}}/infra/buildkit/buildkitd.toml \
+          --bootstrap \
+          --use
 
   setup:cluster:
     desc: "Create the k3d cluster and local image registry"
     status:
       - k3d cluster get {{.CLUSTER_NAME}}
     cmds:
-      - k3d registry create {{.REGISTRY_NAME}} --port {{.REGISTRY_PORT}}
-      - |
-        k3d cluster create {{.CLUSTER_NAME}} \
-          --registry-use k3d-{{.REGISTRY_NAME}}:{{.REGISTRY_PORT}} \
-          --port "8080:80@loadbalancer" \
-          --agents 1 \
-          --wait
+      - k3d cluster create --config ./infra/k3d/config.yaml --wait
       - kubectl create namespace {{.K8S_NAMESPACE}} --dry-run=client -o yaml | kubectl apply -f -
 
   setup:helm:
-    desc: "Add Helm repos and install chart dependencies"
+    desc: "Add Helm repos (no chart dependencies currently)"
     cmds:
-      - helm repo add bitnami https://charts.bitnami.com/bitnami
-      - helm repo update
-      - helm dependency update ./infra/helm/mechatracker
+      - helm repo update || true
 
   # ── Dev ──────────────────────────────────────────────────────────────────────
 
@@ -75,8 +81,8 @@ tasks:
       - task: api:image:push
       - task: helm:upgrade
       - task: db:wait
-      - task: db:migrate
       - echo "✓  http://localhost:8080"
+      - echo "   Run 'task db:forward' then 'task db:migrate' to apply migrations"
 
   dev:logs:
     desc: "Tail API pod logs"
@@ -110,14 +116,16 @@ tasks:
       - go test ./...
 
   api:image:push:
-    desc: "Build and push the API image to the local k3d registry (amd64 + arm64)"
+    desc: "Build and push the API image to the local k3d registry"
     dir: api
+    vars:
+      PLATFORMS: '{{.PLATFORMS | default "linux/arm64"}}'
     cmds:
       - go mod tidy
       - |
         docker buildx build \
-          --platform linux/amd64,linux/arm64 \
-          --tag {{.API_IMAGE}}:latest \
+          --platform {{.PLATFORMS}} \
+          --tag {{.API_IMAGE_PUSH}}:latest \
           --push \
           .
 
@@ -146,7 +154,7 @@ tasks:
         echo "Waiting for Postgres..."
         for i in $(seq 1 30); do
           if kubectl exec -n {{.K8S_NAMESPACE}} \
-               deploy/mechatracker-postgresql -- \
+               statefulset/mechatracker-postgresql -- \
                pg_isready -U mechatracker &>/dev/null; then
             echo "✓ Postgres ready"
             exit 0
@@ -156,10 +164,20 @@ tasks:
         echo "✗ Postgres timed out"; exit 1
 
   db:migrate:
-    desc: "Run pending migrations"
+    desc: "Run pending migrations (port-forward must be running, or use db:migrate:cluster)"
     dir: api
+    dotenv: ['.env']
     cmds:
-      - export $(cat .env | xargs) && migrate -path ./migrations -database "$DATABASE_URL" up
+      - migrate -path ./migrations -database "$DATABASE_URL" up
+
+  db:migrate:cluster:
+    desc: "Run migrations via kubectl exec (no port-forward needed)"
+    cmds:
+      - |
+        kubectl cp api/migrations mechatracker-postgresql-0:/tmp/migrations -n {{.K8S_NAMESPACE}}
+        kubectl exec -n {{.K8S_NAMESPACE}} statefulset/mechatracker-postgresql -- \
+          sh -c 'migrate -path /tmp/migrations -database "postgres://mechatracker:mechatracker@localhost:5432/mechatracker?sslmode=disable" up' 2>/dev/null \
+          || echo "migrate not in container — run: task db:forward then task db:migrate"
 
   db:new:
     desc: "Create a new migration  (NAME=add_something)"
@@ -171,16 +189,17 @@ tasks:
     desc: "Drop and re-run all migrations"
     prompt: "This destroys all local DB data. Continue?"
     dir: api
+    dotenv: ['.env']
     cmds:
-      - export $(cat .env | xargs) && migrate -path ./migrations -database "$DATABASE_URL" drop -f
-      - export $(cat .env | xargs) && migrate -path ./migrations -database "$DATABASE_URL" up
+      - migrate -path ./migrations -database "$DATABASE_URL" drop -f
+      - migrate -path ./migrations -database "$DATABASE_URL" up
 
   db:shell:
     desc: "Open a psql shell into the in-cluster Postgres"
     cmds:
       - |
         kubectl exec -it -n {{.K8S_NAMESPACE}} \
-          deploy/mechatracker-postgresql -- \
+          statefulset/mechatracker-postgresql -- \
           psql -U mechatracker -d mechatracker
 
   db:forward:
