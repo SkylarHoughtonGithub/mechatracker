@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Local Development
-parent: development
+parent: Development
 ---
 
 ## Overview
