@@ -1,0 +1,10 @@
+with-expecter: true
+dir: "internal/mocks"
+outpkg: "mocks"
+resolve-type-alias: false
+disable-version-string: true
+issue-845-fix: true
+packages:
+  github.com/mechatracker/api/internal/store:
+    interfaces:
+      Querier:

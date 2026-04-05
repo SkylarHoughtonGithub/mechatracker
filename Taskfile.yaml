@@ -34,8 +34,14 @@ tasks:
     cmds:
       - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx
       - go install github.com/vektra/mockery/v2@latest
+      - go install github.com/swaggo/swag/cmd/swag@latest
       - npm install -g openapi-typescript
-
+      - |
+        echo ""
+        echo "⚠️  If mockery/swag are not found, add Go binaries to your PATH:"
+        echo "   echo 'export PATH=\"\$PATH:\$(go env GOPATH)/bin\"' >> ~/.zshrc"
+        echo "   source ~/.zshrc"
+        echo ""
   setup:env:
     desc: "Copy api/.env.example → api/.env if it does not exist"
     status:
@@ -214,8 +220,8 @@ tasks:
     cmds:
       - task: generate:sqlc
       - task: generate:mocks
-      - task: generate:openapi
-      - task: generate:ts
+      # - task: generate:openapi # uncomment when adding swaggo annotations to handlers
+      # - task: generate:ts # uncomment when starting web/ (Phase 3)
 
   generate:sqlc:
     dir: api
