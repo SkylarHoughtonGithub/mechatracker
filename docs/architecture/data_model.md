@@ -330,7 +330,5 @@ repair_templates
 
 | Question | Notes |
 |---|---|
-| `repairs.system` — enum or check constraint? | Enum is strict, check constraint is easier to extend. Leaning check constraint. |
-| `updated_at` trigger | Auto-update via Postgres trigger or handle in Go? Trigger is safer. |
 | pgvector for PDF search | Add `vector` column to a `document_chunks` table when PDF indexing is built in Phase 4 |
 | Mileage tracking | Log mileage per repair for service interval tracking — future feature |

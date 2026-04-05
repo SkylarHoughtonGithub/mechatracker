@@ -6,7 +6,7 @@ parent: Architecture
 ## Monorepo layout
 
 ```
-parttrack/
+mechaTracker/
 ├── api/                        # Go API — source of truth for the data contract
 │   ├── cmd/
 │   │   ├── api/                # main.go — API server entrypoint

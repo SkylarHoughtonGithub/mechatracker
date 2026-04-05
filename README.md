@@ -90,16 +90,11 @@ Run `task generate` to regenerate everything. CI validates generated files are u
 ## Getting started
 
 ```sh
-# Install tools
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
-go install github.com/vektra/mockery/v2@latest
-npm install -g @go-task/cli
+# Install bootstrap tools
+./hack/bootstrap.sh
 
-# Install JS dependencies
-npm install
-
-# Copy environment config
-cp .env.example .env
+# Install dependencies and cluster
+task setup
 
 # Start local stack (API + Postgres + web)
 task dev
@@ -113,7 +108,7 @@ task dev
 task dev                              # start full local stack
 task generate                         # regenerate all generated files
 task api:test                         # run Go tests
-task db:new NAME=add_something        # create a new migration
+task db:new NAME=add_something        # create a new migration and scaffolds sqlc migration files
 task infra:plan                       # preview infrastructure changes
 ```
 

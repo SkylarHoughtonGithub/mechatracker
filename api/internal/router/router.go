@@ -1,6 +1,3 @@
-// Package router wires up the Gin engine: global middleware, versioned route
-// groups, and handler registration. Add new route groups here as features
-// are built out. Handlers themselves live in internal/handlers/*.
 package router
 
 import (
@@ -11,37 +8,39 @@ import (
 
 	"github.com/mechatracker/api/internal/apierr"
 	"github.com/mechatracker/api/internal/config"
+	"github.com/mechatracker/api/internal/handler"
 	"github.com/mechatracker/api/internal/middleware"
+	"github.com/mechatracker/api/internal/store"
 )
 
 // New builds and returns the configured Gin engine.
-func New(cfg *config.Config, log *zap.Logger) *gin.Engine {
+// q is the sqlc Querier — passed in so main.go owns the DB pool lifecycle.
+func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := gin.New() // don't use gin.Default() — we supply our own middleware
+	r := gin.New()
 
-	// ── Global middleware (every request) ────────────────────────────────────
 	r.Use(
 		middleware.RequestID,
 		middleware.Recovery(log),
 		middleware.Logger(log),
 	)
 
-	// ── Health / readiness (no auth) ─────────────────────────────────────────
 	r.GET("/health", handleHealth)
 	r.GET("/ready", handleReady)
 
-	// ── API v1 ────────────────────────────────────────────────────────────────
+	// ── Handlers ─────────────────────────────────────────────
+	vh := handler.NewVehicleHandler(q, log)
+
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
 	{
-		registerVehicleRoutes(v1)
+		registerVehicleRoutes(v1, vh)
 		registerRepairRoutes(v1)
 		registerGarageRoutes(v1)
 
-		// Org-scoped routes — require an active Clerk org context.
 		org := v1.Group("/org")
 		org.Use(middleware.RequireOrg)
 		{
@@ -49,7 +48,6 @@ func New(cfg *config.Config, log *zap.Logger) *gin.Engine {
 		}
 	}
 
-	// ── 404 / 405 handlers ────────────────────────────────────────────────────
 	r.NoRoute(func(c *gin.Context) {
 		apierr.NotFound(c, "The requested route does not exist.")
 	})
@@ -60,26 +58,27 @@ func New(cfg *config.Config, log *zap.Logger) *gin.Engine {
 	return r
 }
 
-// ── Health handlers ───────────────────────────────────────────────────────────
+// ── Health ────────────────────────────────────────────────────
 
 func handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// handleReady is a richer check — add DB ping here once the store layer exists.
 func handleReady(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ready"})
 }
 
-// ── Route group stubs — replace with real handlers as you build each feature ──
+// ── Route registration ────────────────────────────────────────
 
-func registerVehicleRoutes(rg *gin.RouterGroup) {
+// registerVehicleRoutes wires the real VehicleHandler.
+// Stub replaced.
+func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v := rg.Group("/vehicles")
-	v.GET("", stub("list vehicles"))
-	v.POST("", stub("create vehicle"))
-	v.GET("/:vehicleID", stub("get vehicle"))
-	v.PATCH("/:vehicleID", stub("update vehicle"))
-	v.DELETE("/:vehicleID", stub("delete vehicle"))
+	v.GET("", h.List)
+	v.POST("", h.Create)
+	v.GET("/:vehicleID", h.Get)
+	v.PATCH("/:vehicleID", h.Update)
+	v.DELETE("/:vehicleID", h.Delete)
 }
 
 func registerRepairRoutes(rg *gin.RouterGroup) {
@@ -103,8 +102,6 @@ func registerOrgRoutes(rg *gin.RouterGroup) {
 	rg.PATCH("/members/:userID/role", stub("update member role"))
 }
 
-// stub returns a placeholder handler that responds 501 until real handlers are
-// wired in. Replace with actual handler functions as each feature is built.
 func stub(name string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(http.StatusNotImplemented, gin.H{

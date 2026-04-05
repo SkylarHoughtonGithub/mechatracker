@@ -21,17 +21,36 @@ Run once on a fresh machine:
 task setup       # installs all tools, creates cluster, installs Helm chart
 ```
 
-`bootstrap.sh` installs only Homebrew and `task`. Everything else — Go, Node, k3d, kubectl, helm, sqlc, golang-migrate, docker-buildx — is installed by `task setup:tools`.
+`bootstrap.sh` installs only Homebrew and `task`. Everything else — Go, Node, k3d, kubectl, helm, sqlc, golang-migrate, docker-buildx, mockery, swag — is installed by `task setup:tools`.
+
+After `task setup:tools`, ensure Go binaries are on your PATH. If `mockery` or `swag` are not found after installing:
+
+```sh
+echo 'export PATH="$PATH:$(go env GOPATH)/bin"' >> ~/.zshrc
+source ~/.zshrc
+```
 
 ### Inner loop
 
 ```sh
 task dev          # build image → deploy → wait for postgres
 task db:forward   # port-forward postgres to localhost:5432 (separate terminal)
-task db:shell     # Open a psql shell on the postgres instance
+task db:shell     # open a psql shell on the postgres instance
 task db:migrate   # run pending migrations
 task dev:logs     # tail API logs
 ```
+
+### Code generation
+
+```sh
+task generate           # run all generators (sqlc + mockery)
+task generate:sqlc      # regenerate internal/store/ from queries/*.sql
+task generate:mocks     # regenerate internal/mocks/ from store.Querier interface
+```
+
+`generate:openapi` and `generate:ts` are commented out until Phase 3 (web app). They require `swag` annotations on handlers and a Next.js `shared/` package to exist.
+
+Run `task generate` after any change to `queries/*.sql` or `migrations/*.up.sql`. Commit the generated files — CI validates they are up to date on every PR.
 
 ---
 
@@ -90,6 +109,31 @@ Migrations are not run automatically as part of `task dev` because the migrate b
 - Add a dedicated migrate Job to the Helm chart
 - Accept the manual port-forward step (current approach)
 
+Migration files live in `api/migrations/` and use the naming convention `000N_description.up.sql` / `000N_description.down.sql`. Create new migrations with:
+
+```sh
+task db:new NAME=add_something
+```
+
+### Dev seeds
+
+`000002_dev_seeds.up.sql` inserts a dev org and dev user with stable sentinel UUIDs:
+
+| Entity | UUID |
+|---|---|
+| Dev org | `00000000-0000-0000-0000-000000000003` |
+| Dev user | `00000000-0000-0000-0000-000000000002` |
+
+These match the `DevOrgID` and `DevUserID` constants in `internal/middleware/auth.go` and are injected into every request when `CLERK_DEV_BYPASS=true`. This means `GET /v1/vehicles` returns vehicles scoped to the dev org without any Clerk setup.
+
 ### Auth bypass
 
-`CLERK_DEV_BYPASS=true` in `values.dev.yaml` skips JWT verification entirely. All requests are treated as user `dev_user_local` / org `dev_org_local` with role `org:admin`. The config validator prevents this flag from being set outside `ENV=development`.
+`CLERK_DEV_BYPASS=true` in `values.dev.yaml` skips JWT verification entirely. All requests are treated as `DevUserID` / `DevOrgID` with role `org:admin`. The config validator prevents this flag from being set outside `ENV=development`.
+
+Full Clerk JWT verification (`rsaPEMFromJWK` in `middleware/auth.go`) is not yet implemented — it currently panics if called. This is intentional: the bypass covers all local dev needs and real Clerk auth will be wired in before staging is stood up. See `auth.md` for the current status.
+
+### sqlc and mockery
+
+`sqlc.yaml` lives in `api/` and is configured to read schema from `migrations/001_init.up` and queries from `queries/`. Output goes to `internal/store/`.
+
+`.mockery.yaml` lives in `api/` and generates `MockQuerier` into `internal/mocks/mock_Querier.go` from the `store.Querier` interface. Use `MockQuerier` in handler unit tests to avoid needing a real database connection.

@@ -126,7 +126,7 @@ parent: Architecture
 **Pros**
 - 1 million MAU free — by far the most generous free tier
 - Purpose-built for B2B — SSO, SCIM, audit logs are primary features
-- Strong enterprise story if PartTrack targets shops/fleets at scale
+- Strong enterprise story if mechaTracker targets shops/fleets at scale
 - Clean JWT-based verification, Go compatible
 
 **Cons**
@@ -208,13 +208,13 @@ parent: Architecture
 - Weeks of work before building anything useful — password reset, MFA, social login all from scratch
 - Security surface you own and maintain forever
 - No mobile SDK — React Native integration is entirely manual
-- Auth is not what makes PartTrack valuable — time is better spent elsewhere early on
+- Auth is not what makes mechaTracker valuable — time is better spent elsewhere early on
 
 ---
 
 ## Key insight
 
-The organizations/teams feature is the deciding factor for PartTrack. The shop/fleet multi-user model means you need a concept of "workspace" — a shop owner and their techs all belonging to the same account. Auth0, Firebase, Cognito, Supabase, and WorkOS all require building this from scratch. Clerk and Kinde have it built-in, which represents weeks of saved development time.
+The organizations/teams feature is the deciding factor for mechaTracker. The shop/fleet multi-user model means you need a concept of "workspace" — a shop owner and their techs all belonging to the same account. Auth0, Firebase, Cognito, Supabase, and WorkOS all require building this from scratch. Clerk and Kinde have it built-in, which represents weeks of saved development time.
 
 **Go backend note:** All JWT-based providers (Clerk, Kinde, Auth0, Firebase, Supabase, WorkOS) allow your Go middleware to verify tokens using a public key — no vendor SDK required on the backend. Your API stays provider-agnostic where it counts.
 
@@ -224,7 +224,9 @@ The organizations/teams feature is the deciding factor for PartTrack. The shop/f
 
 ## Decision
 
-**Status:** Leaning Clerk — open to Kinde as a strong alternative
+**Status:** Decided Clerk
+
+ dev bypass is implemented with CLERK_DEV_BYPASS=true but JWK verification (rsaPEMFromJWK) is still stubbed out and needs lestrrat-go/jwx/v2.
 
 **Rationale:** Organizations API covers the shop/fleet model without custom build. Best React/Next.js developer experience. Official React Native SDK. Go backend uses standard JWT verification — no vendor dependency on the API layer. Kinde is worth a closer look given its slightly larger free tier and built-in billing module.
 
