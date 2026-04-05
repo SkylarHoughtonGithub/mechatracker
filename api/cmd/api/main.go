@@ -10,16 +10,15 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 
 	"github.com/mechatracker/api/internal/config"
 	"github.com/mechatracker/api/internal/router"
+	"github.com/mechatracker/api/internal/store"
 )
 
 func main() {
-	// ── Logger ────────────────────────────────────────────────────────────────
-	// Development gets a human-friendly console logger; production gets JSON.
-	// The logger is passed down rather than used as a global.
 	log, err := buildLogger()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "failed to build logger: %v\n", err)
@@ -27,7 +26,6 @@ func main() {
 	}
 	defer log.Sync() //nolint:errcheck
 
-	// ── Config ────────────────────────────────────────────────────────────────
 	cfg, err := config.Load()
 	if err != nil {
 		log.Fatal("failed to load config", zap.Error(err))
@@ -38,8 +36,23 @@ func main() {
 		zap.Int("port", cfg.Port),
 	)
 
-	// ── Router ────────────────────────────────────────────────────────────────
-	r := router.New(cfg, log)
+	// ── Database ──────────────────────────────────────────────
+	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)
+	if err != nil {
+		log.Fatal("failed to open db pool", zap.Error(err))
+	}
+	defer pool.Close()
+
+	if err := pool.Ping(context.Background()); err != nil {
+		log.Fatal("db ping failed", zap.Error(err))
+	}
+	log.Info("database connected")
+
+	// ── sqlc Querier ──────────────────────────────────────────
+	q := store.New(pool)
+
+	// ── Router ────────────────────────────────────────────────
+	r := router.New(cfg, log, q)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%d", cfg.Port),
@@ -49,7 +62,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// ── Graceful shutdown ─────────────────────────────────────────────────────
 	go func() {
 		log.Info("listening", zap.String("addr", srv.Addr))
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {

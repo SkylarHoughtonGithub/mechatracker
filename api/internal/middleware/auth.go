@@ -19,10 +19,10 @@ import (
 
 // Context keys — use these to read values downstream in handlers.
 const (
-	KeyUserID    = "user_id"     // Clerk user ID, e.g. "user_2abc..."
-	KeyOrgID     = "org_id"      // Clerk org ID, e.g. "org_2abc..." (may be empty)
-	KeyOrgRole   = "org_role"    // "org:admin" | "org:member" etc.
-	KeyRequestID = "request_id"  // set by RequestID middleware
+	KeyUserID    = "user_id"    // Clerk user ID, e.g. "user_2abc..."
+	KeyOrgID     = "org_id"     // Clerk org ID, e.g. "org_2abc..." (may be empty)
+	KeyOrgRole   = "org_role"   // "org:admin" | "org:member" etc.
+	KeyRequestID = "request_id" // set by RequestID middleware
 )
 
 // clerkClaims maps the JWT claims issued by Clerk.
@@ -47,11 +47,16 @@ type clerkClaims struct {
 // JWKS are fetched from cfg.ClerkJWKSURL on first use and cached for 1 hour
 // so we don't hammer Clerk on every request.
 func Auth(cfg *config.Config, log *zap.Logger) gin.HandlerFunc {
+	const (
+		DevUserID = "00000000-0000-0000-0000-000000000002"
+		DevOrgID  = "00000000-0000-0000-0000-000000000003"
+	)
+
 	if cfg.ClerkDevBypass {
 		log.Warn("⚠️  Clerk auth is BYPASSED — dev mode only. Never set CLERK_DEV_BYPASS in staging/prod.")
 		return func(c *gin.Context) {
-			c.Set(KeyUserID, "dev_user_local")
-			c.Set(KeyOrgID, "dev_org_local")
+			c.Set(KeyUserID, DevUserID)
+			c.Set(KeyOrgID, DevOrgID)
 			c.Set(KeyOrgRole, "org:admin")
 			c.Next()
 		}
