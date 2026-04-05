@@ -64,8 +64,8 @@ DigitalOcean account
 │   ├── Droplet: api (Go API + background workers)
 │   ├── Droplet: web (Next.js)
 │   └── Managed PostgreSQL cluster
-├── Spaces bucket: parttrack-uploads (photos, PDFs)
-├── Container Registry: parttrack (Docker images)
+├── Spaces bucket: mechaTracker-uploads (photos, PDFs)
+├── Container Registry: mechaTracker (Docker images)
 └── Cloud Firewall (public ports: 80, 443 only)
 ```
 
@@ -81,12 +81,12 @@ All services run as Docker containers on their respective Droplets. Docker Compo
 ```
 api Droplet
 └── docker-compose.yml
-    ├── parttrack-api      (Go binary, port 8080)
-    └── parttrack-worker   (Go background worker)
+    ├── mechaTracker-api      (Go binary, port 8080)
+    └── mechaTracker-worker   (Go background worker)
 
 web Droplet
 └── docker-compose.yml
-    └── parttrack-web      (Next.js, port 3000)
+    └── mechaTracker-web      (Next.js, port 3000)
 ```
 
 Nginx runs on each Droplet as a reverse proxy, handles SSL termination via Let's Encrypt, and forwards traffic to the container.
@@ -109,7 +109,7 @@ Everything provisioned and managed in code:
 # Resources managed by Terraform
 digitalocean_droplet          # api, web
 digitalocean_database_cluster # postgres
-digitalocean_database_db      # parttrack db
+digitalocean_database_db      # mechaTracker db
 digitalocean_spaces_bucket    # uploads
 digitalocean_container_registry
 digitalocean_vpc
