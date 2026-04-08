@@ -19,7 +19,7 @@ COPY . .
 # Cross-compile natively — no emulation involved
 RUN --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -o bin/api ./cmd/api
+    go build ${GOFLAGS} -o bin/api ./cmd/api
 
 # ── Runtime stage ─────────────────────────────────────────────────────────────
 FROM alpine:3.19
