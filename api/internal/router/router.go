@@ -33,13 +33,14 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 
 	// ── Handlers ─────────────────────────────────────────────
 	vh := handler.NewVehicleHandler(q, log)
+	gh := handler.NewGarageHandler(q, log)
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
 	{
 		registerVehicleRoutes(v1, vh)
 		registerRepairRoutes(v1)
-		registerGarageRoutes(v1)
+		registerGarageRoutes(v1, gh)
 
 		org := v1.Group("/org")
 		org.Use(middleware.RequireOrg)
@@ -70,8 +71,6 @@ func handleReady(c *gin.Context) {
 
 // ── Route registration ────────────────────────────────────────
 
-// registerVehicleRoutes wires the real VehicleHandler.
-// Stub replaced.
 func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v := rg.Group("/vehicles")
 	v.GET("", h.List)
@@ -92,9 +91,9 @@ func registerRepairRoutes(rg *gin.RouterGroup) {
 	r.POST("/:repairID/photos", stub("upload photo"))
 }
 
-func registerGarageRoutes(rg *gin.RouterGroup) {
+func registerGarageRoutes(rg *gin.RouterGroup, h *handler.GarageHandler) {
 	g := rg.Group("/garage")
-	g.GET("", stub("get garage"))
+	g.GET("", h.GetGarage)
 }
 
 func registerOrgRoutes(rg *gin.RouterGroup) {

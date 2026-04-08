@@ -131,6 +131,7 @@ tasks:
       - |
         docker buildx build \
           --platform {{.PLATFORMS}} \
+          --build-arg GOFLAGS=-p=2 \
           --tag {{.API_IMAGE_PUSH}}:latest \
           --push \
           .

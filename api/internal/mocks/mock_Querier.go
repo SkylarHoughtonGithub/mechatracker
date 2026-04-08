@@ -680,6 +680,122 @@ func (_c *MockQuerier_DeleteVehicle_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// GetGarageStats provides a mock function with given fields: ctx, orgID
+func (_m *MockQuerier) GetGarageStats(ctx context.Context, orgID uuid.UUID) (store.GetGarageStatsRow, error) {
+	ret := _m.Called(ctx, orgID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGarageStats")
+	}
+
+	var r0 store.GetGarageStatsRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (store.GetGarageStatsRow, error)); ok {
+		return rf(ctx, orgID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) store.GetGarageStatsRow); ok {
+		r0 = rf(ctx, orgID)
+	} else {
+		r0 = ret.Get(0).(store.GetGarageStatsRow)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, orgID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetGarageStats_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGarageStats'
+type MockQuerier_GetGarageStats_Call struct {
+	*mock.Call
+}
+
+// GetGarageStats is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID uuid.UUID
+func (_e *MockQuerier_Expecter) GetGarageStats(ctx interface{}, orgID interface{}) *MockQuerier_GetGarageStats_Call {
+	return &MockQuerier_GetGarageStats_Call{Call: _e.mock.On("GetGarageStats", ctx, orgID)}
+}
+
+func (_c *MockQuerier_GetGarageStats_Call) Run(run func(ctx context.Context, orgID uuid.UUID)) *MockQuerier_GetGarageStats_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetGarageStats_Call) Return(_a0 store.GetGarageStatsRow, _a1 error) *MockQuerier_GetGarageStats_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetGarageStats_Call) RunAndReturn(run func(context.Context, uuid.UUID) (store.GetGarageStatsRow, error)) *MockQuerier_GetGarageStats_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetGarageVehicles provides a mock function with given fields: ctx, orgID
+func (_m *MockQuerier) GetGarageVehicles(ctx context.Context, orgID uuid.UUID) ([]store.GetGarageVehiclesRow, error) {
+	ret := _m.Called(ctx, orgID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetGarageVehicles")
+	}
+
+	var r0 []store.GetGarageVehiclesRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]store.GetGarageVehiclesRow, error)); ok {
+		return rf(ctx, orgID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []store.GetGarageVehiclesRow); ok {
+		r0 = rf(ctx, orgID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]store.GetGarageVehiclesRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, orgID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetGarageVehicles_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetGarageVehicles'
+type MockQuerier_GetGarageVehicles_Call struct {
+	*mock.Call
+}
+
+// GetGarageVehicles is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID uuid.UUID
+func (_e *MockQuerier_Expecter) GetGarageVehicles(ctx interface{}, orgID interface{}) *MockQuerier_GetGarageVehicles_Call {
+	return &MockQuerier_GetGarageVehicles_Call{Call: _e.mock.On("GetGarageVehicles", ctx, orgID)}
+}
+
+func (_c *MockQuerier_GetGarageVehicles_Call) Run(run func(ctx context.Context, orgID uuid.UUID)) *MockQuerier_GetGarageVehicles_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetGarageVehicles_Call) Return(_a0 []store.GetGarageVehiclesRow, _a1 error) *MockQuerier_GetGarageVehicles_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetGarageVehicles_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]store.GetGarageVehiclesRow, error)) *MockQuerier_GetGarageVehicles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetRepair provides a mock function with given fields: ctx, arg
 func (_m *MockQuerier) GetRepair(ctx context.Context, arg store.GetRepairParams) (store.Repair, error) {
 	ret := _m.Called(ctx, arg)

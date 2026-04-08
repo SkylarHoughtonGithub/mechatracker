@@ -28,6 +28,13 @@ type Querier interface {
 	DeleteStep(ctx context.Context, arg DeleteStepParams) error
 	// Returns the deleted row so the caller can snapshot it into deleted_items.
 	DeleteVehicle(ctx context.Context, arg DeleteVehicleParams) (Vehicle, error)
+	// Org-level aggregate stats for the summary header.
+	// Single row — safe to cache at 60s TTL.
+	GetGarageStats(ctx context.Context, orgID uuid.UUID) (GetGarageStatsRow, error)
+	// Returns one row per vehicle+system combination for the org.
+	// The handler collapses these into nested vehicle → []systems structs.
+	// Vehicles with no repairs appear once with NULL system columns.
+	GetGarageVehicles(ctx context.Context, orgID uuid.UUID) ([]GetGarageVehiclesRow, error)
 	// ============================================================
 	// mechatracker — Repair Queries
 	// ============================================================
