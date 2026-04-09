@@ -451,23 +451,23 @@ func (q *Queries) UpdateRepairProgress(ctx context.Context, arg UpdateRepairProg
 
 const updateRepairStatus = `-- name: UpdateRepairStatus :one
 UPDATE repairs SET
-    status       = $2,
-    started_at   = CASE WHEN $2 = 'in_progress' AND started_at IS NULL
+    status       = $1::repair_status,
+    started_at   = CASE WHEN $1::repair_status = 'in_progress' AND started_at IS NULL
                         THEN now() ELSE started_at END,
-    completed_at = CASE WHEN $2 = 'completed' THEN now() ELSE completed_at END
-WHERE id = $1
+    completed_at = CASE WHEN $1::repair_status = 'completed' THEN now() ELSE completed_at END
+WHERE id = $2
   AND org_id = $3
 RETURNING id, vehicle_id, org_id, created_by, assigned_to, template_id, title, system, status, progress_pct, total_parts_cost, started_at, completed_at, created_at, updated_at
 `
 
 type UpdateRepairStatusParams struct {
-	ID     uuid.UUID    `json:"id"`
 	Status RepairStatus `json:"status"`
+	ID     uuid.UUID    `json:"id"`
 	OrgID  uuid.UUID    `json:"org_id"`
 }
 
 func (q *Queries) UpdateRepairStatus(ctx context.Context, arg UpdateRepairStatusParams) (Repair, error) {
-	row := q.db.QueryRow(ctx, updateRepairStatus, arg.ID, arg.Status, arg.OrgID)
+	row := q.db.QueryRow(ctx, updateRepairStatus, arg.Status, arg.ID, arg.OrgID)
 	var i Repair
 	err := row.Scan(
 		&i.ID,
