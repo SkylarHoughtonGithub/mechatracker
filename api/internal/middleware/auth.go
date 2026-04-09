@@ -2,15 +2,14 @@ package middleware
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
 
 	"github.com/mechatracker/api/internal/apierr"
@@ -161,39 +160,26 @@ func (c *jwksCache) refresh() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.url, nil)
-	resp, err := http.DefaultClient.Do(req)
+	set, err := jwk.Fetch(ctx, c.url)
 	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	var jwks struct {
-		Keys []struct {
-			Kid string `json:"kid"`
-			// jwt library can parse the full JWK; we decode to map and hand off.
-			N   string `json:"n"`
-			E   string `json:"e"`
-			Kty string `json:"kty"`
-		} `json:"keys"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&jwks); err != nil {
-		return err
+		return fmt.Errorf("jwks: fetch failed: %w", err)
 	}
 
-	keys := make(map[string]any, len(jwks.Keys))
-	for _, k := range jwks.Keys {
-		pub, err := jwt.ParseRSAPublicKeyFromPEM([]byte(
-			// Re-encode as PEM so golang-jwt can parse it.
-			// In production you'd use a proper JWK parser (e.g. github.com/lestrrat-go/jwx).
-			// This is a placeholder — swap in your preferred JWK library.
-			rsaPEMFromJWK(k.N, k.E),
-		))
-		if err != nil {
-			c.log.Warn("jwks: failed to parse key", zap.String("kid", k.Kid), zap.Error(err))
+	keys := make(map[string]any, set.Len())
+	for i := 0; i < set.Len(); i++ {
+		key, ok := set.Key(i)
+		if !ok {
 			continue
 		}
-		keys[k.Kid] = pub
+		var raw any
+		if err := key.Raw(&raw); err != nil {
+			c.log.Warn("jwks: failed to extract raw key",
+				zap.String("kid", key.KeyID()),
+				zap.Error(err),
+			)
+			continue
+		}
+		keys[key.KeyID()] = raw
 	}
 
 	c.mu.Lock()
@@ -203,12 +189,4 @@ func (c *jwksCache) refresh() error {
 
 	c.log.Info("jwks: refreshed", zap.Int("keys", len(keys)))
 	return nil
-}
-
-// rsaPEMFromJWK is a stub. Replace with a proper JWK → PEM conversion using
-// github.com/lestrrat-go/jwx/v2 or similar. Listed as a dependency placeholder.
-func rsaPEMFromJWK(n, e string) string {
-	// TODO: implement proper base64url → big.Int → rsa.PublicKey → PEM encoding.
-	// Recommended: github.com/lestrrat-go/jwx/v2/jwk
-	panic("rsaPEMFromJWK: not implemented — add github.com/lestrrat-go/jwx/v2")
 }
