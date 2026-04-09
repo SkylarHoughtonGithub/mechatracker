@@ -1435,6 +1435,65 @@ func (_c *MockQuerier_ListRepairsByVehicle_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// ListResources provides a mock function with given fields: ctx, repairID
+func (_m *MockQuerier) ListResources(ctx context.Context, repairID uuid.UUID) ([]store.Resource, error) {
+	ret := _m.Called(ctx, repairID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListResources")
+	}
+
+	var r0 []store.Resource
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]store.Resource, error)); ok {
+		return rf(ctx, repairID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []store.Resource); ok {
+		r0 = rf(ctx, repairID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]store.Resource)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, repairID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_ListResources_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListResources'
+type MockQuerier_ListResources_Call struct {
+	*mock.Call
+}
+
+// ListResources is a helper method to define mock.On call
+//   - ctx context.Context
+//   - repairID uuid.UUID
+func (_e *MockQuerier_Expecter) ListResources(ctx interface{}, repairID interface{}) *MockQuerier_ListResources_Call {
+	return &MockQuerier_ListResources_Call{Call: _e.mock.On("ListResources", ctx, repairID)}
+}
+
+func (_c *MockQuerier_ListResources_Call) Run(run func(ctx context.Context, repairID uuid.UUID)) *MockQuerier_ListResources_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_ListResources_Call) Return(_a0 []store.Resource, _a1 error) *MockQuerier_ListResources_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_ListResources_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]store.Resource, error)) *MockQuerier_ListResources_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // ListSteps provides a mock function with given fields: ctx, repairID
 func (_m *MockQuerier) ListSteps(ctx context.Context, repairID uuid.UUID) ([]store.RepairStep, error) {
 	ret := _m.Called(ctx, repairID)

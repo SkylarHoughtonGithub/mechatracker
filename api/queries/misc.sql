@@ -154,3 +154,8 @@ RETURNING *;
 -- name: PurgeExpiredDeletedItems :exec
 -- Run by the nightly background worker.
 DELETE FROM deleted_items WHERE purge_at < now();
+
+-- name: ListResources :many
+SELECT * FROM resources
+WHERE repair_id = $1
+ORDER BY saved_at ASC;

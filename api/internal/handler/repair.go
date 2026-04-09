@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -182,7 +184,9 @@ func (h *RepairHandler) Get(c *gin.Context) {
 //   - status change (status field present) → UpdateRepairStatus
 //   - field edits (title, system, assigned_to) → UpdateRepair
 //
-// Both are combined into one endpoint to keep the client surface simple.
+// When transitioning to completed, an immutable history snapshot is written.
+// The snapshot write is best-effort — a failure logs but does not roll back
+// the status update, since the status transition already committed.
 
 type updateRepairReq struct {
 	// Status transition — mutually exclusive with field edits.
@@ -211,16 +215,43 @@ func (h *RepairHandler) Update(c *gin.Context) {
 	}
 
 	if req.Status != nil {
-		// Status transition path.
-		repair, err := h.q.UpdateRepairStatus(c.Request.Context(), store.UpdateRepairStatusParams{
-			ID:     repairID,
-			OrgID:  orgID,
-			Status: store.RepairStatus(*req.Status),
+		// Fetch current state to validate the transition.
+		current, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+			ID:    repairID,
+			OrgID: orgID,
 		})
 		if err != nil {
 			apierr.NotFound(c, "Repair not found.")
 			return
 		}
+
+		to := store.RepairStatus(*req.Status)
+		if !isValidTransition(current.Status, to) {
+			apierr.BadRequest(c, fmt.Sprintf(
+				"Cannot transition repair from %q to %q.", current.Status, to,
+			))
+			return
+		}
+
+		repair, err := h.q.UpdateRepairStatus(c.Request.Context(), store.UpdateRepairStatusParams{
+			ID:     repairID,
+			OrgID:  orgID,
+			Status: to,
+		})
+		if err != nil {
+			apierr.NotFound(c, "Repair not found.")
+			return
+		}
+
+		if repair.Status == store.RepairStatusCompleted {
+			if err := h.writeRepairHistory(c, repair, orgID); err != nil {
+				h.log.Error("writeRepairHistory failed",
+					zap.Error(err),
+					zap.String("repair_id", repair.ID.String()),
+				)
+			}
+		}
+
 		c.JSON(http.StatusOK, repair)
 		return
 	}
@@ -251,201 +282,133 @@ func (h *RepairHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, repair)
 }
 
-// ── POST /v1/repairs/:repairID/steps/:stepID/complete ─────────────────────────
-// Toggles step completion. If already complete → uncomplete; if incomplete → complete.
-// After toggling, recalculates progress_pct and total_parts_cost on the repair.
-//
-// Route note: the router currently registers this as complete-only. Wire up a
-// DELETE or separate POST /uncomplete if you want explicit uncomplete from the client.
-// For now a single endpoint that reads the current state and toggles is simpler.
+// ── writeRepairHistory ────────────────────────────────────────────────────────
+// Called when a repair transitions to completed. Fetches the vehicle, assignee,
+// steps, parts, notes, and resources in parallel then writes a single immutable
+// snapshot row to repair_history.
 
-func (h *RepairHandler) CompleteStep(c *gin.Context) {
-	orgID, ok := orgIDFromCtx(c)
-	if !ok {
-		return
-	}
-	repairID, ok := parseUUIDParam(c, "repairID")
-	if !ok {
-		return
-	}
-	stepID, ok := parseUUIDParam(c, "stepID")
-	if !ok {
-		return
-	}
+func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, orgID uuid.UUID) error {
+	ctx := c.Request.Context()
 
-	// Verify the repair belongs to this org before touching steps.
-	repair, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
-		ID:    repairID,
-		OrgID: orgID,
-	})
-	if err != nil {
-		apierr.NotFound(c, "Repair not found.")
-		return
-	}
+	var (
+		vehicle   store.Vehicle
+		assignee  *store.User
+		steps     []store.RepairStep
+		parts     []store.Part
+		notes     []store.ListNotesRow
+		resources []store.Resource
+	)
 
-	// Fetch the step to check its current state.
-	steps, err := h.q.ListSteps(c.Request.Context(), repairID)
-	if err != nil {
-		h.log.Error("ListSteps for toggle", zap.Error(err))
-		apierr.Internal(c)
-		return
-	}
+	g, gctx := errgroup.WithContext(ctx)
 
-	var currentlyCompleted bool
-	found := false
-	for _, s := range steps {
-		if s.ID == stepID {
-			currentlyCompleted = s.Completed
-			found = true
-			break
-		}
-	}
-	if !found {
-		apierr.NotFound(c, "Step not found.")
-		return
-	}
-
-	var updatedStep store.RepairStep
-	if currentlyCompleted {
-		updatedStep, err = h.q.UncompleteStep(c.Request.Context(), store.UncompleteStepParams{
-			ID:       stepID,
-			RepairID: repairID,
+	g.Go(func() error {
+		var err error
+		vehicle, err = h.q.GetVehicle(gctx, store.GetVehicleParams{
+			ID:    repair.VehicleID,
+			OrgID: orgID,
 		})
-	} else {
-		updatedStep, err = h.q.CompleteStep(c.Request.Context(), store.CompleteStepParams{
-			ID:       stepID,
-			RepairID: repairID,
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		steps, err = h.q.ListSteps(gctx, repair.ID)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		parts, err = h.q.ListParts(gctx, repair.ID)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		notes, err = h.q.ListNotes(gctx, repair.ID)
+		return err
+	})
+
+	g.Go(func() error {
+		var err error
+		resources, err = h.q.ListResources(gctx, repair.ID)
+		return err
+	})
+
+	// Fetch assignee only if assigned_to is set.
+	if repair.AssignedTo.Valid {
+		g.Go(func() error {
+			u, err := h.q.GetUserByID(gctx, repair.AssignedTo.Bytes)
+			if err != nil {
+				return err
+			}
+			assignee = &u
+			return nil
 		})
 	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("snapshot fetch: %w", err)
+	}
+
+	// Build human-readable snapshot strings.
+	vehicleSnapshot := buildVehicleSnapshot(vehicle)
+	var assignedSnapshot *string
+	if assignee != nil {
+		s := assignee.Name
+		assignedSnapshot = &s
+	}
+
+	// Marshal list snapshots to JSON.
+	stepsJSON, err := json.Marshal(steps)
 	if err != nil {
-		h.log.Error("toggle step", zap.Error(err))
-		apierr.Internal(c)
-		return
+		return fmt.Errorf("marshal steps: %w", err)
 	}
-
-	// Recalculate progress_pct.
-	counts, err := h.q.CountSteps(c.Request.Context(), repairID)
+	partsJSON, err := json.Marshal(parts)
 	if err != nil {
-		h.log.Error("CountSteps", zap.Error(err))
-		apierr.Internal(c)
-		return
+		return fmt.Errorf("marshal parts: %w", err)
 	}
-
-	var pct int16
-	if counts.Total > 0 {
-		pct = int16(counts.Completed * 100 / counts.Total)
-	}
-
-	// Refresh total_parts_cost while we're here.
-	partsCost, err := h.q.SumPartsCost(c.Request.Context(), repairID)
+	notesJSON, err := json.Marshal(notes)
 	if err != nil {
-		h.log.Error("SumPartsCost", zap.Error(err))
-		apierr.Internal(c)
-		return
+		return fmt.Errorf("marshal notes: %w", err)
+	}
+	resourcesJSON, err := json.Marshal(resources)
+	if err != nil {
+		return fmt.Errorf("marshal resources: %w", err)
 	}
 
-	updatedRepair, err := h.q.UpdateRepairProgress(c.Request.Context(), store.UpdateRepairProgressParams{
-		ID:             repairID,
-		ProgressPct:    pct,
-		TotalPartsCost: partsCost,
+	_, err = h.q.WriteRepairHistory(ctx, store.WriteRepairHistoryParams{
+		RepairID:          repair.ID,
+		VehicleID:         repair.VehicleID,
+		OrgID:             repair.OrgID,
+		CreatedBy:         repair.CreatedBy,
+		AssignedTo:        repair.AssignedTo,
+		VehicleSnapshot:   vehicleSnapshot,
+		AssignedSnapshot:  assignedSnapshot,
+		Title:             repair.Title,
+		System:            repair.System,
+		TotalPartsCost:    repair.TotalPartsCost,
+		TotalSteps:        int16(len(steps)),
+		StepsSnapshot:     stepsJSON,
+		PartsSnapshot:     partsJSON,
+		NotesSnapshot:     notesJSON,
+		ResourcesSnapshot: resourcesJSON,
+		StartedAt:         repair.StartedAt,
+		CompletedAt:       repair.CompletedAt,
 	})
-	if err != nil {
-		h.log.Error("UpdateRepairProgress", zap.Error(err))
-		apierr.Internal(c)
-		return
-	}
-
-	// Suppress unused variable warning — repair was fetched for auth, not used in response.
-	_ = repair
-
-	c.JSON(http.StatusOK, gin.H{
-		"step":   updatedStep,
-		"repair": updatedRepair,
-	})
+	return err
 }
 
-// ── POST /v1/repairs/:repairID/notes ─────────────────────────────────────────
-
-type createNoteReq struct {
-	Body string `json:"body" binding:"required,min=1,max=5000"`
-}
-
-func (h *RepairHandler) CreateNote(c *gin.Context) {
-	orgID, ok := orgIDFromCtx(c)
-	if !ok {
-		return
+// buildVehicleSnapshot produces the human-readable vehicle string frozen into
+// repair_history at completion time. Example: "2018 Ford F-150 XLT — Unit #07"
+func buildVehicleSnapshot(v store.Vehicle) string {
+	s := fmt.Sprintf("%d %s %s", v.Year, v.Make, v.Model)
+	if v.Trim != nil && *v.Trim != "" {
+		s += " " + *v.Trim
 	}
-	repairID, ok := parseUUIDParam(c, "repairID")
-	if !ok {
-		return
+	if v.UnitLabel != nil && *v.UnitLabel != "" {
+		s += " — " + *v.UnitLabel
 	}
-	callerID, ok := callerIDFromCtx(c)
-	if !ok {
-		return
-	}
-
-	// Verify repair ownership.
-	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
-		ID:    repairID,
-		OrgID: orgID,
-	}); err != nil {
-		apierr.NotFound(c, "Repair not found.")
-		return
-	}
-
-	var req createNoteReq
-	if err := c.ShouldBindJSON(&req); err != nil {
-		apierr.BadRequest(c, err.Error())
-		return
-	}
-
-	note, err := h.q.CreateNote(c.Request.Context(), store.CreateNoteParams{
-		RepairID: repairID,
-		UserID:   callerID,
-		Body:     req.Body,
-	})
-	if err != nil {
-		h.log.Error("CreateNote", zap.Error(err))
-		apierr.Internal(c)
-		return
-	}
-
-	c.JSON(http.StatusCreated, note)
-}
-
-// ── POST /v1/repairs/:repairID/photos ─────────────────────────────────────────
-// Returns a presigned upload URL. The client uploads directly to Spaces —
-// the API never proxies the bytes.
-//
-// TODO (Phase 2): wire up DigitalOcean Spaces presigned URLs once
-// SPACES_ENDPOINT / SPACES_BUCKET / SPACES_ACCESS_KEY / SPACES_SECRET_KEY
-// are configured. For now this returns a 501 with a clear message.
-
-func (h *RepairHandler) UploadPhoto(c *gin.Context) {
-	orgID, ok := orgIDFromCtx(c)
-	if !ok {
-		return
-	}
-	repairID, ok := parseUUIDParam(c, "repairID")
-	if !ok {
-		return
-	}
-
-	// Verify repair ownership before issuing any URL.
-	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
-		ID:    repairID,
-		OrgID: orgID,
-	}); err != nil {
-		apierr.NotFound(c, "Repair not found.")
-		return
-	}
-
-	// TODO: generate presigned PUT URL via aws-sdk-go-v2 + DO Spaces endpoint.
-	// Shape of the eventual response:
-	//   { "upload_url": "https://...", "storage_key": "repairs/<id>/photos/<uuid>.jpg", "expires_in": 900 }
-	c.JSON(http.StatusNotImplemented, gin.H{
-		"message": "Photo upload not yet implemented — wire up DigitalOcean Spaces in Phase 2.",
-	})
+	return s
 }
 
 // ── POST /v1/repairs/:repairID/steps ─────────────────────────────────────────
@@ -547,7 +510,209 @@ func (h *RepairHandler) DeleteStep(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true, "id": stepID})
 }
 
+// ── POST /v1/repairs/:repairID/steps/:stepID/complete ─────────────────────────
+// Toggles step completion. If already complete → uncomplete; if incomplete → complete.
+// After toggling, recalculates progress_pct and total_parts_cost on the repair.
+
+func (h *RepairHandler) CompleteStep(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	repairID, ok := parseUUIDParam(c, "repairID")
+	if !ok {
+		return
+	}
+	stepID, ok := parseUUIDParam(c, "stepID")
+	if !ok {
+		return
+	}
+
+	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Repair not found.")
+		return
+	}
+
+	steps, err := h.q.ListSteps(c.Request.Context(), repairID)
+	if err != nil {
+		h.log.Error("ListSteps for toggle", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	var currentlyCompleted bool
+	found := false
+	for _, s := range steps {
+		if s.ID == stepID {
+			currentlyCompleted = s.Completed
+			found = true
+			break
+		}
+	}
+	if !found {
+		apierr.NotFound(c, "Step not found.")
+		return
+	}
+
+	var updatedStep store.RepairStep
+	if currentlyCompleted {
+		updatedStep, err = h.q.UncompleteStep(c.Request.Context(), store.UncompleteStepParams{
+			ID:       stepID,
+			RepairID: repairID,
+		})
+	} else {
+		updatedStep, err = h.q.CompleteStep(c.Request.Context(), store.CompleteStepParams{
+			ID:       stepID,
+			RepairID: repairID,
+		})
+	}
+	if err != nil {
+		h.log.Error("toggle step", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	counts, err := h.q.CountSteps(c.Request.Context(), repairID)
+	if err != nil {
+		h.log.Error("CountSteps", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	var pct int16
+	if counts.Total > 0 {
+		pct = int16(counts.Completed * 100 / counts.Total)
+	}
+
+	partsCost, err := h.q.SumPartsCost(c.Request.Context(), repairID)
+	if err != nil {
+		h.log.Error("SumPartsCost", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	updatedRepair, err := h.q.UpdateRepairProgress(c.Request.Context(), store.UpdateRepairProgressParams{
+		ID:             repairID,
+		ProgressPct:    pct,
+		TotalPartsCost: partsCost,
+	})
+	if err != nil {
+		h.log.Error("UpdateRepairProgress", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"step":   updatedStep,
+		"repair": updatedRepair,
+	})
+}
+
+// ── POST /v1/repairs/:repairID/notes ─────────────────────────────────────────
+
+type createNoteReq struct {
+	Body string `json:"body" binding:"required,min=1,max=5000"`
+}
+
+func (h *RepairHandler) CreateNote(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	repairID, ok := parseUUIDParam(c, "repairID")
+	if !ok {
+		return
+	}
+	callerID, ok := callerIDFromCtx(c)
+	if !ok {
+		return
+	}
+
+	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Repair not found.")
+		return
+	}
+
+	var req createNoteReq
+	if err := c.ShouldBindJSON(&req); err != nil {
+		apierr.BadRequest(c, err.Error())
+		return
+	}
+
+	note, err := h.q.CreateNote(c.Request.Context(), store.CreateNoteParams{
+		RepairID: repairID,
+		UserID:   callerID,
+		Body:     req.Body,
+	})
+	if err != nil {
+		h.log.Error("CreateNote", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusCreated, note)
+}
+
+// ── POST /v1/repairs/:repairID/photos ─────────────────────────────────────────
+// Returns a presigned upload URL. The client uploads directly to Spaces —
+// the API never proxies the bytes.
+//
+// TODO (Phase 2): wire up DigitalOcean Spaces presigned URLs once
+// SPACES_ENDPOINT / SPACES_BUCKET / SPACES_ACCESS_KEY / SPACES_SECRET_KEY
+// are configured.
+
+func (h *RepairHandler) UploadPhoto(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	repairID, ok := parseUUIDParam(c, "repairID")
+	if !ok {
+		return
+	}
+
+	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Repair not found.")
+		return
+	}
+
+	c.JSON(http.StatusNotImplemented, gin.H{
+		"message": "Photo upload not yet implemented — wire up DigitalOcean Spaces in Phase 2.",
+	})
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// validTransitions defines the allowed status progressions for a repair.
+// Any transition not listed here is rejected with a 400.
+var validTransitions = map[store.RepairStatus][]store.RepairStatus{
+	store.RepairStatusDraft:        {store.RepairStatusInProgress},
+	store.RepairStatusInProgress:   {store.RepairStatusPendingParts, store.RepairStatusCompleted},
+	store.RepairStatusPendingParts: {store.RepairStatusInProgress, store.RepairStatusCompleted},
+	store.RepairStatusCompleted:    {}, // terminal — no transitions out
+}
+
+func isValidTransition(from, to store.RepairStatus) bool {
+	allowed, ok := validTransitions[from]
+	if !ok {
+		return false
+	}
+	for _, s := range allowed {
+		if s == to {
+			return true
+		}
+	}
+	return false
+}
 
 // repairIsEditable returns true when the repair status allows structural changes
 // (adding/removing steps and parts). Allowed: draft, in_progress.
