@@ -457,6 +457,41 @@ func (q *Queries) ListParts(ctx context.Context, repairID uuid.UUID) ([]Part, er
 	return items, nil
 }
 
+const listResources = `-- name: ListResources :many
+SELECT id, repair_id, source_type, title, url, thumbnail_url, metadata, saved_at FROM resources
+WHERE repair_id = $1
+ORDER BY saved_at ASC
+`
+
+func (q *Queries) ListResources(ctx context.Context, repairID uuid.UUID) ([]Resource, error) {
+	rows, err := q.db.Query(ctx, listResources, repairID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Resource{}
+	for rows.Next() {
+		var i Resource
+		if err := rows.Scan(
+			&i.ID,
+			&i.RepairID,
+			&i.SourceType,
+			&i.Title,
+			&i.Url,
+			&i.ThumbnailUrl,
+			&i.Metadata,
+			&i.SavedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSteps = `-- name: ListSteps :many
 
 SELECT id, repair_id, position, title, notes, torque_spec, completed, completed_at, created_at FROM repair_steps
@@ -553,20 +588,20 @@ func (q *Queries) UncompleteStep(ctx context.Context, arg UncompleteStepParams) 
 }
 
 const updateMemberRole = `-- name: UpdateMemberRole :one
-UPDATE users SET role = $2
-WHERE id = $1
+UPDATE users SET role = $1::user_role
+WHERE id = $2
   AND org_id = $3
 RETURNING id, clerk_id, org_id, role, email, name, created_at
 `
 
 type UpdateMemberRoleParams struct {
-	ID    uuid.UUID `json:"id"`
 	Role  UserRole  `json:"role"`
+	ID    uuid.UUID `json:"id"`
 	OrgID uuid.UUID `json:"org_id"`
 }
 
 func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (User, error) {
-	row := q.db.QueryRow(ctx, updateMemberRole, arg.ID, arg.Role, arg.OrgID)
+	row := q.db.QueryRow(ctx, updateMemberRole, arg.Role, arg.ID, arg.OrgID)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -628,20 +663,20 @@ func (q *Queries) UpdatePart(ctx context.Context, arg UpdatePartParams) (Part, e
 }
 
 const updatePartStatus = `-- name: UpdatePartStatus :one
-UPDATE parts SET status = $2
-WHERE id = $1
+UPDATE parts SET status = $1::part_status
+WHERE id = $2
   AND repair_id = $3
 RETURNING id, repair_id, name, part_number, supplier, status, cost, notes, created_at
 `
 
 type UpdatePartStatusParams struct {
-	ID       uuid.UUID  `json:"id"`
 	Status   PartStatus `json:"status"`
+	ID       uuid.UUID  `json:"id"`
 	RepairID uuid.UUID  `json:"repair_id"`
 }
 
 func (q *Queries) UpdatePartStatus(ctx context.Context, arg UpdatePartStatusParams) (Part, error) {
-	row := q.db.QueryRow(ctx, updatePartStatus, arg.ID, arg.Status, arg.RepairID)
+	row := q.db.QueryRow(ctx, updatePartStatus, arg.Status, arg.ID, arg.RepairID)
 	var i Part
 	err := row.Scan(
 		&i.ID,

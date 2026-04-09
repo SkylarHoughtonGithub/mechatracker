@@ -64,9 +64,9 @@ VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: UpdatePartStatus :one
-UPDATE parts SET status = $2
-WHERE id = $1
-  AND repair_id = $3
+UPDATE parts SET status = @status::part_status
+WHERE id = @id
+  AND repair_id = @repair_id
 RETURNING *;
 
 -- name: UpdatePart :one
@@ -137,9 +137,9 @@ WHERE org_id = $1
 ORDER BY name ASC;
 
 -- name: UpdateMemberRole :one
-UPDATE users SET role = $2
-WHERE id = $1
-  AND org_id = $3
+UPDATE users SET role = @role::user_role
+WHERE id = @id
+  AND org_id = @org_id
 RETURNING *;
 
 -- ============================================================
@@ -154,3 +154,8 @@ RETURNING *;
 -- name: PurgeExpiredDeletedItems :exec
 -- Run by the nightly background worker.
 DELETE FROM deleted_items WHERE purge_at < now();
+
+-- name: ListResources :many
+SELECT * FROM resources
+WHERE repair_id = $1
+ORDER BY saved_at ASC;

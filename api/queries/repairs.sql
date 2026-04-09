@@ -37,12 +37,12 @@ RETURNING *;
 
 -- name: UpdateRepairStatus :one
 UPDATE repairs SET
-    status       = $2,
-    started_at   = CASE WHEN $2 = 'in_progress' AND started_at IS NULL
+    status       = @status::repair_status,
+    started_at   = CASE WHEN @status::repair_status = 'in_progress' AND started_at IS NULL
                         THEN now() ELSE started_at END,
-    completed_at = CASE WHEN $2 = 'completed' THEN now() ELSE completed_at END
-WHERE id = $1
-  AND org_id = $3
+    completed_at = CASE WHEN @status::repair_status = 'completed' THEN now() ELSE completed_at END
+WHERE id = @id
+  AND org_id = @org_id
 RETURNING *;
 
 -- name: UpdateRepair :one

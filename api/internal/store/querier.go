@@ -66,6 +66,7 @@ type Querier interface {
 	ListParts(ctx context.Context, repairID uuid.UUID) ([]Part, error)
 	ListRepairHistory(ctx context.Context, arg ListRepairHistoryParams) ([]RepairHistory, error)
 	ListRepairsByVehicle(ctx context.Context, arg ListRepairsByVehicleParams) ([]Repair, error)
+	ListResources(ctx context.Context, repairID uuid.UUID) ([]Resource, error)
 	// ============================================================
 	// mechatracker — Steps Queries
 	// ============================================================

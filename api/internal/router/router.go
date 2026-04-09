@@ -34,12 +34,14 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	// ── Handlers ─────────────────────────────────────────────
 	vh := handler.NewVehicleHandler(q, log)
 	gh := handler.NewGarageHandler(q, log)
+	rh := handler.NewRepairHandler(q, log)
+	ph := handler.NewPartsHandler(q, log)
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
 	{
 		registerVehicleRoutes(v1, vh)
-		registerRepairRoutes(v1)
+		registerRepairRoutes(v1, rh, ph)
 		registerGarageRoutes(v1, gh)
 
 		org := v1.Group("/org")
@@ -80,15 +82,21 @@ func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v.DELETE("/:vehicleID", h.Delete)
 }
 
-func registerRepairRoutes(rg *gin.RouterGroup) {
+func registerRepairRoutes(rg *gin.RouterGroup, h *handler.RepairHandler, ph *handler.PartsHandler) {
 	r := rg.Group("/repairs")
-	r.GET("", stub("list repairs"))
-	r.POST("", stub("create repair"))
-	r.GET("/:repairID", stub("get repair"))
-	r.PATCH("/:repairID", stub("update repair"))
-	r.POST("/:repairID/steps/:stepID/complete", stub("complete step"))
-	r.POST("/:repairID/notes", stub("add note"))
-	r.POST("/:repairID/photos", stub("upload photo"))
+	r.GET("", h.List)
+	r.POST("", h.Create)
+	r.GET("/:repairID", h.Get)
+	r.PATCH("/:repairID", h.Update)
+	r.POST("/:repairID/steps", h.CreateStep)
+	r.POST("/:repairID/steps/:stepID/complete", h.CompleteStep)
+	r.DELETE("/:repairID/steps/:stepID", h.DeleteStep)
+	r.POST("/:repairID/parts", ph.Create)
+	r.PATCH("/:repairID/parts/:partID", ph.Update)
+	r.PATCH("/:repairID/parts/:partID/status", ph.UpdateStatus)
+	r.DELETE("/:repairID/parts/:partID", ph.Delete)
+	r.POST("/:repairID/notes", h.CreateNote)
+	r.POST("/:repairID/photos", h.UploadPhoto)
 }
 
 func registerGarageRoutes(rg *gin.RouterGroup, h *handler.GarageHandler) {
