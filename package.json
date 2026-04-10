@@ -1,3 +1,17 @@
-{  
-    "workspaces": ["web", "mobile", "shared"]
+{
+  "name": "mechatracker",
+  "private": true,
+  "workspaces": [
+    "web",
+    "mobile",
+    "shared"
+  ],
+  "nohoist": [
+    "**/tailwindcss",
+    "**/tailwindcss/**"
+  ],
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "tailwindcss": "^4.2.2"
+  }
 }
