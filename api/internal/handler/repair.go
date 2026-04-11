@@ -34,9 +34,16 @@ type repairDetail struct {
 	Parts []store.Part       `json:"parts"`
 }
 
-// ── GET /v1/repairs ───────────────────────────────────────────────────────────
-// Returns active (in_progress) repairs assigned to or created by the caller.
-
+// List godoc
+// @Summary      List active repairs
+// @Description  Returns in-progress repairs assigned to or created by the caller.
+// @Tags         repairs
+// @Produce      json
+// @Success      200  {array}   SwaggerActiveRepair
+// @Failure      401  {object}  apierr.ErrorResponse
+// @Failure      500  {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs [get]
 func (h *RepairHandler) List(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -60,16 +67,28 @@ func (h *RepairHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, repairs)
 }
 
-// ── POST /v1/repairs ──────────────────────────────────────────────────────────
-
+// createRepairReq is the request body for creating a repair.
 type createRepairReq struct {
-	VehicleID  string  `json:"vehicle_id"  binding:"required,uuid"`
-	Title      string  `json:"title"       binding:"required,max=200"`
-	System     string  `json:"system"      binding:"required,max=100"`
+	VehicleID  string  `json:"vehicle_id"  binding:"required,uuid" example:"a44d8522-66b3-4146-af64-9db60c72470a"`
+	Title      string  `json:"title"       binding:"required,max=200" example:"Brake pad replacement"`
+	System     string  `json:"system"      binding:"required,max=100" example:"brakes"`
 	AssignedTo *string `json:"assigned_to" binding:"omitempty,uuid"`
 	TemplateID *string `json:"template_id" binding:"omitempty,uuid"`
 }
 
+// Create godoc
+// @Summary      Create a repair
+// @Description  Creates a new repair in draft status for a vehicle.
+// @Tags         repairs
+// @Accept       json
+// @Produce      json
+// @Param        body  body      createRepairReq  true  "Repair details"
+// @Success      201   {object}  SwaggerRepair
+// @Failure      400   {object}  apierr.ErrorResponse
+// @Failure      401   {object}  apierr.ErrorResponse
+// @Failure      500   {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs [post]
 func (h *RepairHandler) Create(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -128,10 +147,19 @@ func (h *RepairHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, repair)
 }
 
-// ── GET /v1/repairs/:repairID ─────────────────────────────────────────────────
-// Returns the repair record plus its steps and parts in one response.
-// Steps and parts are fetched in parallel.
-
+// Get godoc
+// @Summary      Get a repair
+// @Description  Returns the repair record with its steps and parts in one response.
+// @Tags         repairs
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Success      200       {object}  SwaggerRepairDetail
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      500       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID} [get]
 func (h *RepairHandler) Get(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -179,25 +207,32 @@ func (h *RepairHandler) Get(c *gin.Context) {
 	})
 }
 
-// ── PATCH /v1/repairs/:repairID ───────────────────────────────────────────────
-// Handles two distinct update operations:
-//   - status change (status field present) → UpdateRepairStatus
-//   - field edits (title, system, assigned_to) → UpdateRepair
-//
-// When transitioning to completed, an immutable history snapshot is written.
-// The snapshot write is best-effort — a failure logs but does not roll back
-// the status update, since the status transition already committed.
-
+// updateRepairReq is the request body for updating a repair.
+// Provide `status` for a status transition, or field edits otherwise — not both.
 type updateRepairReq struct {
 	// Status transition — mutually exclusive with field edits.
-	Status *string `json:"status" binding:"omitempty,oneof=draft in_progress pending_parts completed"`
+	Status *string `json:"status" binding:"omitempty,oneof=draft in_progress pending_parts completed" example:"in_progress"`
 
 	// Field edits — all optional.
-	Title      *string `json:"title"       binding:"omitempty,max=200"`
-	System     *string `json:"system"      binding:"omitempty,max=100"`
+	Title      *string `json:"title"       binding:"omitempty,max=200" example:"Brake pad replacement"`
+	System     *string `json:"system"      binding:"omitempty,max=100" example:"brakes"`
 	AssignedTo *string `json:"assigned_to" binding:"omitempty,uuid"`
 }
 
+// Update godoc
+// @Summary      Update a repair
+// @Description  Handles two operations: status transition (provide `status`) or field edits (provide `title`/`system`/`assigned_to`). Completing a repair writes an immutable history snapshot.
+// @Tags         repairs
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string           true  "Repair UUID"  format(uuid)
+// @Param        body      body      updateRepairReq  true  "Update payload"
+// @Success      200       {object}  SwaggerRepair
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID} [patch]
 func (h *RepairHandler) Update(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -215,7 +250,6 @@ func (h *RepairHandler) Update(c *gin.Context) {
 	}
 
 	if req.Status != nil {
-		// Fetch current state to validate the transition.
 		current, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
 			ID:    repairID,
 			OrgID: orgID,
@@ -256,7 +290,6 @@ func (h *RepairHandler) Update(c *gin.Context) {
 		return
 	}
 
-	// Field edit path.
 	params := store.UpdateRepairParams{
 		ID:     repairID,
 		OrgID:  orgID,
@@ -282,11 +315,6 @@ func (h *RepairHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, repair)
 }
 
-// ── writeRepairHistory ────────────────────────────────────────────────────────
-// Called when a repair transitions to completed. Fetches the vehicle, assignee,
-// steps, parts, notes, and resources in parallel then writes a single immutable
-// snapshot row to repair_history.
-
 func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, orgID uuid.UUID) error {
 	ctx := c.Request.Context()
 
@@ -309,32 +337,27 @@ func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, 
 		})
 		return err
 	})
-
 	g.Go(func() error {
 		var err error
 		steps, err = h.q.ListSteps(gctx, repair.ID)
 		return err
 	})
-
 	g.Go(func() error {
 		var err error
 		parts, err = h.q.ListParts(gctx, repair.ID)
 		return err
 	})
-
 	g.Go(func() error {
 		var err error
 		notes, err = h.q.ListNotes(gctx, repair.ID)
 		return err
 	})
-
 	g.Go(func() error {
 		var err error
 		resources, err = h.q.ListResources(gctx, repair.ID)
 		return err
 	})
 
-	// Fetch assignee only if assigned_to is set.
 	if repair.AssignedTo.Valid {
 		g.Go(func() error {
 			u, err := h.q.GetUserByID(gctx, repair.AssignedTo.Bytes)
@@ -350,7 +373,6 @@ func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, 
 		return fmt.Errorf("snapshot fetch: %w", err)
 	}
 
-	// Build human-readable snapshot strings.
 	vehicleSnapshot := buildVehicleSnapshot(vehicle)
 	var assignedSnapshot *string
 	if assignee != nil {
@@ -358,7 +380,6 @@ func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, 
 		assignedSnapshot = &s
 	}
 
-	// Marshal list snapshots to JSON.
 	stepsJSON, err := json.Marshal(steps)
 	if err != nil {
 		return fmt.Errorf("marshal steps: %w", err)
@@ -398,8 +419,6 @@ func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, 
 	return err
 }
 
-// buildVehicleSnapshot produces the human-readable vehicle string frozen into
-// repair_history at completion time. Example: "2018 Ford F-150 XLT — Unit #07"
 func buildVehicleSnapshot(v store.Vehicle) string {
 	s := fmt.Sprintf("%d %s %s", v.Year, v.Make, v.Model)
 	if v.Trim != nil && *v.Trim != "" {
@@ -411,16 +430,29 @@ func buildVehicleSnapshot(v store.Vehicle) string {
 	return s
 }
 
-// ── POST /v1/repairs/:repairID/steps ─────────────────────────────────────────
-// Adds a step to a repair. Only allowed when status is draft or in_progress.
-
+// createStepReq is the request body for adding a step to a repair.
 type createStepReq struct {
-	Position   int16   `json:"position"    binding:"required,min=1"`
-	Title      string  `json:"title"       binding:"required,max=200"`
-	Notes      *string `json:"notes"`
-	TorqueSpec *string `json:"torque_spec"`
+	Position   int16   `json:"position"    binding:"required,min=1" example:"1"`
+	Title      string  `json:"title"       binding:"required,max=200" example:"Remove wheel"`
+	Notes      *string `json:"notes"       example:"Use 21mm socket"`
+	TorqueSpec *string `json:"torque_spec" example:"100 ft-lbs"`
 }
 
+// CreateStep godoc
+// @Summary      Add a step to a repair
+// @Description  Adds a step to a repair. Only allowed when repair status is draft or in_progress.
+// @Tags         repairs
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string          true  "Repair UUID"  format(uuid)
+// @Param        body      body      createStepReq   true  "Step details"
+// @Success      201       {object}  SwaggerRepairStep
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      500       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/steps [post]
 func (h *RepairHandler) CreateStep(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -467,9 +499,19 @@ func (h *RepairHandler) CreateStep(c *gin.Context) {
 	c.JSON(http.StatusCreated, step)
 }
 
-// ── DELETE /v1/repairs/:repairID/steps/:stepID ────────────────────────────────
-// Removes a step. Only allowed when status is draft or in_progress.
-
+// DeleteStep godoc
+// @Summary      Delete a step
+// @Description  Removes a step from a repair. Only allowed when status is draft or in_progress.
+// @Tags         repairs
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Param        stepID    path      string  true  "Step UUID"    format(uuid)
+// @Success      200       {object}  SwaggerDeletedResponse  "deleted: true, id: <uuid>"
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/steps/{stepID} [delete]
 func (h *RepairHandler) DeleteStep(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -510,10 +552,20 @@ func (h *RepairHandler) DeleteStep(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true, "id": stepID})
 }
 
-// ── POST /v1/repairs/:repairID/steps/:stepID/complete ─────────────────────────
-// Toggles step completion. If already complete → uncomplete; if incomplete → complete.
-// After toggling, recalculates progress_pct and total_parts_cost on the repair.
-
+// CompleteStep godoc
+// @Summary      Toggle step completion
+// @Description  Toggles a step between complete and incomplete. Recalculates repair progress_pct after the toggle.
+// @Tags         repairs
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Param        stepID    path      string  true  "Step UUID"    format(uuid)
+// @Success      200       {object}  SwaggerStepToggleResponse  "step and repair objects"
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      500       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/steps/{stepID}/complete [post]
 func (h *RepairHandler) CompleteStep(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -611,12 +663,26 @@ func (h *RepairHandler) CompleteStep(c *gin.Context) {
 	})
 }
 
-// ── POST /v1/repairs/:repairID/notes ─────────────────────────────────────────
-
+// createNoteReq is the request body for adding a note.
 type createNoteReq struct {
-	Body string `json:"body" binding:"required,min=1,max=5000"`
+	Body string `json:"body" binding:"required,min=1,max=5000" example:"Noticed some scoring on the rotor — ordered replacement."`
 }
 
+// CreateNote godoc
+// @Summary      Add a note to a repair
+// @Description  Creates a timestamped note on the repair, attributed to the caller.
+// @Tags         repairs
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string          true  "Repair UUID"  format(uuid)
+// @Param        body      body      createNoteReq   true  "Note body"
+// @Success      201       {object}  SwaggerRepairNote
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      500       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/notes [post]
 func (h *RepairHandler) CreateNote(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -659,14 +725,19 @@ func (h *RepairHandler) CreateNote(c *gin.Context) {
 	c.JSON(http.StatusCreated, note)
 }
 
-// ── POST /v1/repairs/:repairID/photos ─────────────────────────────────────────
-// Returns a presigned upload URL. The client uploads directly to Spaces —
-// the API never proxies the bytes.
-//
-// TODO (Phase 2): wire up DigitalOcean Spaces presigned URLs once
-// SPACES_ENDPOINT / SPACES_BUCKET / SPACES_ACCESS_KEY / SPACES_SECRET_KEY
-// are configured.
-
+// UploadPhoto godoc
+// @Summary      Get a photo upload URL
+// @Description  Returns a presigned URL for direct-to-Spaces photo upload. Not yet implemented — wire DigitalOcean Spaces config first.
+// @Tags         repairs
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Success      200       {object}  map[string]interface{}  "upload_url"
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      501       {object}  map[string]interface{}  "not implemented"
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/photos [post]
 func (h *RepairHandler) UploadPhoto(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -698,7 +769,7 @@ var validTransitions = map[store.RepairStatus][]store.RepairStatus{
 	store.RepairStatusDraft:        {store.RepairStatusInProgress},
 	store.RepairStatusInProgress:   {store.RepairStatusPendingParts, store.RepairStatusCompleted},
 	store.RepairStatusPendingParts: {store.RepairStatusInProgress, store.RepairStatusCompleted},
-	store.RepairStatusCompleted:    {}, // terminal — no transitions out
+	store.RepairStatusCompleted:    {},
 }
 
 func isValidTransition(from, to store.RepairStatus) bool {

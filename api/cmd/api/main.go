@@ -1,3 +1,18 @@
+// Package main is the entry point for the mechatracker API server.
+//
+// @title           mechatracker API
+// @version         0.1.0
+// @description     Repair tracking platform for mechanics, auto shops, and fleet managers.
+//
+// @contact.name    mechatracker support
+//
+// @host            localhost:8080
+// @BasePath        /v1
+//
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Type "Bearer" followed by a space and the Clerk JWT.
 package main
 
 import (
@@ -16,6 +31,8 @@ import (
 	"github.com/mechatracker/api/internal/config"
 	"github.com/mechatracker/api/internal/router"
 	"github.com/mechatracker/api/internal/store"
+
+	_ "github.com/mechatracker/api/openapi"
 )
 
 func main() {

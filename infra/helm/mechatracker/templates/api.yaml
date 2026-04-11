@@ -6,6 +6,7 @@ metadata:
     {{- include "mechatracker.labels" . | nindent 4 }}
     app: mechatracker-api
 spec:
+  revisionHistoryLimit: 1
   replicas: {{ .Values.api.replicaCount }}
   selector:
     matchLabels:
@@ -14,6 +15,7 @@ spec:
     metadata:
       labels:
         app: mechatracker-api
+        rollme: {{ .Values.api.rollme | default "static" | quote }}
         {{- include "mechatracker.labels" . | nindent 8 }}
     spec:
       containers:

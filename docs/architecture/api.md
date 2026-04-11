@@ -15,16 +15,24 @@ The API is a Go service using the Gin HTTP framework. It follows a layered struc
 ```
 api/
 ├── cmd/api/main.go          # entry point — wires config, DB pool, router
+├── docs/                    # swaggo-generated — do not hand-edit
+│   ├── docs.go
+│   ├── swagger.json
+│   └── swagger.yaml
+├── openapi/                 # generated pipeline artifacts — do not hand-edit
+│   └── openapi3.yaml        # swagger2openapi output — fed to openapi-typescript
 ├── internal/
-│   ├── router/router.go     # route registration
+│   ├── router/router.go     # route registration + Swagger UI endpoint
 │   ├── middleware/          # auth, logging, recovery, request ID
 │   ├── handler/             # one file per domain (vehicle.go, repair.go, ...)
+│   │   └── swagger_types.go # swagger-friendly mirror types for annotations
 │   ├── store/               # sqlc-generated — do not hand-edit
 │   ├── mocks/               # mockery-generated — do not hand-edit
 │   ├── apierr/              # canonical error response helpers
 │   └── config/              # env-driven config, loaded once at startup
 ├── migrations/              # golang-migrate SQL files — schema source of truth
 ├── queries/                 # hand-written SQL → sqlc generates store/
+├── .swaggo                  # type overrides for pgtype.* and decimal
 └── sqlc.yaml                # sqlc config
 ```
 
@@ -41,7 +49,15 @@ client
   → handler func            (parses input, calls store, writes response)
 ```
 
-Every authenticated route goes through all five layers. The `/health` and `/ready` endpoints skip Auth.
+Every authenticated route goes through all five layers. The `/health`, `/ready`, and `/swagger/*` endpoints skip Auth.
+
+---
+
+## Swagger UI
+
+Available in non-production environments at `http://localhost:8080/swagger/index.html`. The UI is served by `ginSwagger` and disabled when `ENV=production`.
+
+The spec is generated from swaggo annotations on the handler functions. See [Code generation](#code-generation) below.
 
 ---
 
@@ -110,7 +126,7 @@ if err := c.ShouldBindJSON(&req); err != nil {
 }
 ```
 
-URL parameters are parsed with the `parseUUIDParam` helper in `handler/vehicle.go`. Add equivalent helpers to other handler files as needed, or promote them to a shared `handler/helpers.go` once there are three or more handlers using them.
+URL parameters are parsed with the `parseUUIDParam` helper in `handler/vehicle.go`.
 
 ---
 
@@ -153,8 +169,6 @@ The `Auth` middleware in `internal/middleware/auth.go` verifies the Clerk JWT an
 | `KeyOrgRole` | `"org:admin"` \| `"org:member"` etc. |
 
 ### Reading context in handlers
-
-Two helpers in `handler/vehicle.go` read these keys. Promote them to `handler/helpers.go` when the second handler is added:
 
 **`orgIDFromCtx`** — parses `KeyOrgID` as a UUID. Aborts with 401 if missing or malformed. Every handler that queries the DB calls this first — it is the org-scoping guard.
 
@@ -205,25 +219,86 @@ Hard deletes write a JSON snapshot of the deleted row to the `deleted_items` tab
 
 ---
 
+## Code generation
+
+Run `task generate` to regenerate all generated files. CI validates generated files are up to date on every PR.
+
+### Pipeline
+
+```
+queries/*.sql  ──sqlc──►  internal/store/       (type-safe DB layer)
+store.Querier  ──mockery──►  internal/mocks/    (test mocks)
+handler annotations  ──swag──►  docs/           (Swagger 2.0 spec)
+docs/swagger.json  ──swagger2openapi──►  openapi/openapi3.yaml  (OAS 3.0)
+openapi/openapi3.yaml  ──openapi-typescript──►  shared/types/index.ts
+```
+
+### Why the conversion step
+
+swaggo generates Swagger 2.0. `openapi-typescript` requires OpenAPI 3.0. `swagger2openapi` bridges the gap. The intermediate `openapi3.yaml` lives in `api/openapi/` and is committed alongside the generated TypeScript types in `shared/types/`.
+
+### swaggo annotations
+
+Handler functions carry swaggo doc comments:
+
+```go
+// List godoc
+// @Summary      List vehicles
+// @Description  Returns all vehicles belonging to the caller's org.
+// @Tags         vehicles
+// @Produce      json
+// @Success      200  {array}   SwaggerVehicle
+// @Failure      401  {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles [get]
+func (h *VehicleHandler) List(c *gin.Context) {
+```
+
+### swagger_types.go
+
+swaggo cannot resolve `pgtype.*` and `shopspring/decimal` types from the store package. `internal/handler/swagger_types.go` defines swagger-friendly mirror structs (`SwaggerRepair`, `SwaggerVehicle`, etc.) using primitive Go types. These are referenced only in annotations — the actual handler code returns real store types, which serialize identically.
+
+The `api/.swaggo` file provides additional type overrides for any `pgtype.*` references that leak through `--parseDependency`.
+
+### Required tools
+
+Beyond the tools installed by `task setup:tools`, the TypeScript generation step requires two globally installed npm packages:
+
+```sh
+npm install -g swagger2openapi
+npm install -g openapi-typescript
+```
+
+These are not yet wired into `task setup:tools` — add them if setting up a fresh machine.
+
+---
+
 ## Implemented endpoints
 
 | Method | Path | Handler | Status |
 |---|---|---|---|
 | GET | `/health` | `handleHealth` | done |
 | GET | `/ready` | `handleReady` | done |
+| GET | `/swagger/*` | `ginSwagger` | done |
 | GET | `/v1/vehicles` | `VehicleHandler.List` | done |
 | POST | `/v1/vehicles` | `VehicleHandler.Create` | done |
 | GET | `/v1/vehicles/:vehicleID` | `VehicleHandler.Get` | done |
 | PATCH | `/v1/vehicles/:vehicleID` | `VehicleHandler.Update` | done |
 | DELETE | `/v1/vehicles/:vehicleID` | `VehicleHandler.Delete` | done |
-| GET | `/v1/repairs` | — | stub |
-| POST | `/v1/repairs` | — | stub |
-| GET | `/v1/repairs/:repairID` | — | stub |
-| PATCH | `/v1/repairs/:repairID` | — | stub |
-| POST | `/v1/repairs/:repairID/steps/:stepID/complete` | — | stub |
-| POST | `/v1/repairs/:repairID/notes` | — | stub |
-| POST | `/v1/repairs/:repairID/photos` | — | stub |
-| GET | `/v1/garage` | — | stub |
+| GET | `/v1/repairs` | `RepairHandler.List` | done |
+| POST | `/v1/repairs` | `RepairHandler.Create` | done |
+| GET | `/v1/repairs/:repairID` | `RepairHandler.Get` | done |
+| PATCH | `/v1/repairs/:repairID` | `RepairHandler.Update` | done |
+| POST | `/v1/repairs/:repairID/steps` | `RepairHandler.CreateStep` | done |
+| POST | `/v1/repairs/:repairID/steps/:stepID/complete` | `RepairHandler.CompleteStep` | done |
+| DELETE | `/v1/repairs/:repairID/steps/:stepID` | `RepairHandler.DeleteStep` | done |
+| POST | `/v1/repairs/:repairID/parts` | `PartsHandler.Create` | done |
+| PATCH | `/v1/repairs/:repairID/parts/:partID` | `PartsHandler.Update` | done |
+| PATCH | `/v1/repairs/:repairID/parts/:partID/status` | `PartsHandler.UpdateStatus` | done |
+| DELETE | `/v1/repairs/:repairID/parts/:partID` | `PartsHandler.Delete` | done |
+| POST | `/v1/repairs/:repairID/notes` | `RepairHandler.CreateNote` | done |
+| POST | `/v1/repairs/:repairID/photos` | `RepairHandler.UploadPhoto` | 501 — Spaces not wired |
+| GET | `/v1/garage` | `GarageHandler.GetGarage` | done |
 | GET | `/v1/org/members` | — | stub |
 | PATCH | `/v1/org/members/:userID/role` | — | stub |
 

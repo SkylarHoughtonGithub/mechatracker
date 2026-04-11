@@ -43,8 +43,43 @@ api:
       cpu: 500m
       memory: 256Mi
 
+# ── Web ───────────────────────────────────────────────────────────────────────
+web:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: mechatracker-registry:5050/mechatracker/web
+    tag: latest
+    pullPolicy: Always
+
+  env:
+    # Points at the API via the in-cluster service name.
+    # In-cluster requests go service-to-service — no ingress hop needed.
+    NEXT_PUBLIC_API_URL: "http://mechatracker-api:8080"
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  ingress:
+    enabled: true
+    className: traefik
+    annotations: {}
+    hosts:
+      - host: web.localhost
+        paths:
+          - path: /
+            pathType: Prefix
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
-# Uses the official postgres image — no Bitnami dependency.
 postgresql:
   enabled: true
 

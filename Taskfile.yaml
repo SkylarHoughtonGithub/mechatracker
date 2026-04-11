@@ -5,12 +5,10 @@ vars:
   REGISTRY_NAME: mechatracker-registry
   REGISTRY_PORT: 5050
   K8S_NAMESPACE: mechatracker-dev
-  # localhost:5050 works for kubectl/helm (host network)
-  # k3d-<name>:5050 is what buildx needs (container-to-container)
-  # Address used by buildx to push (host network, localhost resolves correctly)
   API_IMAGE_PUSH: localhost:{{.REGISTRY_PORT}}/mechatracker/api
-  # Address used by k3d nodes to pull (registry name without k3d- prefix when created via config)
   API_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/api
+  WEB_IMAGE_PUSH: localhost:{{.REGISTRY_PORT}}/mechatracker/web
+  WEB_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/web
 
 tasks:
   default:
@@ -35,13 +33,14 @@ tasks:
       - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx
       - go install github.com/vektra/mockery/v2@latest
       - go install github.com/swaggo/swag/cmd/swag@latest
-      - npm install -g openapi-typescript
+      - npm install -g swagger2openapi openapi-typescript
       - |
         echo ""
         echo "⚠️  If mockery/swag are not found, add Go binaries to your PATH:"
         echo "   echo 'export PATH=\"\$PATH:\$(go env GOPATH)/bin\"' >> ~/.zshrc"
         echo "   source ~/.zshrc"
         echo ""
+
   setup:env:
     desc: "Copy api/.env.example → api/.env if it does not exist"
     status:
@@ -85,21 +84,32 @@ tasks:
     desc: "Build, deploy, and migrate — the main inner loop"
     cmds:
       - task: api:image:push
+      - task: web:image:push
       - task: helm:upgrade
       - task: db:wait
+      - task: dev:hosts
       - echo "✓  http://localhost:8080"
+      - echo "✓  Web  http://web.localhost:8080"
       - echo "   Run 'task db:forward' then 'task db:migrate' to apply migrations"
-
-  dev:logs:
-    desc: "Tail API pod logs"
-    cmds:
-      - kubectl logs -n {{.K8S_NAMESPACE}} -l app=mechatracker-api -f
-
-  dev:restart:
-    desc: "Restart the API pod (e.g. after a config change)"
-    cmds:
-      - kubectl rollout restart deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
-      - kubectl rollout status deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+  
+  dev:hosts:
+  desc: "Check /etc/hosts has required entries for local dev"
+  cmds:
+    - |
+      missing=0
+      for host in "web.localhost"; do
+        if ! grep -q "$host" /etc/hosts; then
+          echo "✗ Missing /etc/hosts entry: 127.0.0.1 $host"
+          missing=1
+        else
+          echo "✓ $host"
+        fi
+      done
+      if [ $missing -eq 1 ]; then
+        echo ""
+        echo "Fix: sudo sh -c 'echo \"127.0.0.1 web.localhost\" >> /etc/hosts'"
+        exit 1
+      fi
 
   dev:status:
     desc: "Show cluster nodes and pod status"
@@ -136,6 +146,60 @@ tasks:
           --push \
           .
 
+  api:logs:
+    desc: "Tail API pod logs"
+    cmds:
+      - kubectl logs -n {{.K8S_NAMESPACE}} -l app=mechatracker-api -f
+
+  api:restart:
+    desc: "Restart the API pod (e.g. after a config change)"
+    cmds:
+      - kubectl rollout restart deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+      - kubectl rollout status deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+
+  api:rollback:
+      desc: "Roll back the API deployment to the previous version"
+      cmds:
+        - kubectl rollout undo deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+        - kubectl rollout status deployment/mechatracker-api -n {{.K8S_NAMESPACE}}
+      
+  # ── Web ─────────────────────────────────────────────────────────────────────
+
+  web:run:
+    desc: "Run the Next.js dev server locally (no cluster needed)"
+    dir: web
+    cmds:
+      - npm run dev
+ 
+  web:image:push:
+    desc: "Build and push the web image to the local k3d registry"
+    # Build context is repo root so shared/ is accessible during build
+    cmds:
+      - |
+        docker buildx build \
+          --platform linux/arm64 \
+          --file web/Dockerfile \
+          --tag {{.WEB_IMAGE_PUSH}}:latest \
+          --push \
+          .
+ 
+  web:logs:
+    desc: "Tail web pod logs"
+    cmds:
+      - kubectl logs -n {{.K8S_NAMESPACE}} -l app=mechatracker-web -f
+ 
+  web:restart:
+    desc: "Restart the web pod (e.g. after an env change)"
+    cmds:
+      - kubectl rollout restart deployment/mechatracker-web -n {{.K8S_NAMESPACE}}
+      - kubectl rollout status deployment/mechatracker-web -n {{.K8S_NAMESPACE}}
+
+  web:rollback:
+    desc: "Roll back the web deployment to the previous version"
+    cmds:
+      - kubectl rollout undo deployment/mechatracker-web -n {{.K8S_NAMESPACE}}
+      - kubectl rollout status deployment/mechatracker-web -n {{.K8S_NAMESPACE}}
+
   # ── Helm ─────────────────────────────────────────────────────────────────────
 
   helm:upgrade:
@@ -145,7 +209,15 @@ tasks:
         helm upgrade --install mechatracker ./infra/helm/mechatracker \
           --namespace {{.K8S_NAMESPACE}} \
           --values ./infra/helm/mechatracker/values.dev.yaml \
+          --set api.rollme="$(date +%s)" \
+          --set web.rollme="$(date +%s)" \
           --wait --timeout 5m
+
+  helm:rollback:
+    desc: "Roll back both API and web deployments to their previous version"
+    deps:
+      - api:rollback
+      - web:rollback
 
   helm:uninstall:
     desc: "Uninstall the Helm release (keeps the cluster)"
@@ -221,8 +293,8 @@ tasks:
     cmds:
       - task: generate:sqlc
       - task: generate:mocks
-      # - task: generate:openapi # uncomment when adding swaggo annotations to handlers
-      # - task: generate:ts # uncomment when starting web/ (Phase 3)
+      - task: generate:openapi
+      - task: generate:ts
 
   generate:sqlc:
     dir: api
@@ -234,10 +306,12 @@ tasks:
 
   generate:openapi:
     dir: api
-    cmds: [swag init -g cmd/api/main.go -o openapi/]
+    cmds: [swag init -g cmd/api/main.go -o openapi/ --parseDependency --parseInternal --overridesFile .swaggo]
 
   generate:ts:
-    cmds: [npx openapi-typescript api/openapi/openapi.yaml -o shared/types/index.ts]
+    cmds:
+      - swagger2openapi api/openapi/swagger.json -o api/openapi/openapi3.yaml
+      - npx openapi-typescript api/openapi/openapi3.yaml -o shared/types/index.ts
 
   # ── Cluster lifecycle ────────────────────────────────────────────────────────
 
