@@ -22,42 +22,42 @@ func NewGarageHandler(q store.Querier, log *zap.Logger) *GarageHandler {
 	return &GarageHandler{q: q, log: log}
 }
 
-// ── Response types ────────────────────────────────────────────────────────────
-
+// garageSystemSummary is a per-system summary within a garage vehicle.
 type garageSystemSummary struct {
-	ID          string `json:"id"`
-	Label       string `json:"label"`
-	RepairCount int64  `json:"repair_count"`
-	HasOpen     bool   `json:"has_open"`
+	ID          string `json:"id"           example:"brakes"`
+	Label       string `json:"label"        example:"Brakes"`
+	RepairCount int64  `json:"repair_count" example:"3"`
+	HasOpen     bool   `json:"has_open"     example:"true"`
 }
 
+// garageVehicle is the vehicle shape returned by the garage endpoint.
 type garageVehicle struct {
-	ID           string                `json:"id"`
-	Year         int16                 `json:"year"`
-	Make         string                `json:"make"`
-	Model        string                `json:"model"`
-	Trim         *string               `json:"trim,omitempty"`
+	ID           string                `json:"id"                      example:"a44d8522-66b3-4146-af64-9db60c72470a"`
+	Year         int16                 `json:"year"                    example:"2019"`
+	Make         string                `json:"make"                    example:"Ford"`
+	Model        string                `json:"model"                   example:"F-150"`
+	Trim         *string               `json:"trim,omitempty"          example:"XLT"`
 	VIN          *string               `json:"vin,omitempty"`
-	Mileage      *int32                `json:"mileage,omitempty"`
+	Mileage      *int32                `json:"mileage,omitempty"       example:"84200"`
 	UnitLabel    *string               `json:"unit_label,omitempty"`
-	LastRepairAt *string               `json:"last_repair_at,omitempty"`
-	OpenRepairs  int64                 `json:"open_repairs"`
+	LastRepairAt *string               `json:"last_repair_at,omitempty" example:"2026-03-15"`
+	OpenRepairs  int64                 `json:"open_repairs"            example:"1"`
 	Systems      []garageSystemSummary `json:"systems"`
 }
 
+// garageStats is the org-level aggregate shown in the garage header.
 type garageStats struct {
-	TotalVehicles int64   `json:"total_vehicles"`
-	OpenRepairs   int64   `json:"open_repairs"`
-	Repairs30d    int64   `json:"repairs_30d"`
-	PartsSpend30d float64 `json:"parts_spend_30d"`
+	TotalVehicles int64   `json:"total_vehicles" example:"4"`
+	OpenRepairs   int64   `json:"open_repairs"   example:"2"`
+	Repairs30d    int64   `json:"repairs_30d"    example:"5"`
+	PartsSpend30d float64 `json:"parts_spend_30d" example:"342.50"`
 }
 
+// garageResponse is the full response body for GET /v1/garage.
 type garageResponse struct {
 	Vehicles []garageVehicle `json:"vehicles"`
 	Stats    garageStats     `json:"stats"`
 }
-
-// ── Handler ───────────────────────────────────────────────────────────────────
 
 // GetGarage godoc
 // @Summary      Aggregated garage view
@@ -65,8 +65,10 @@ type garageResponse struct {
 // @Tags         garage
 // @Produce      json
 // @Success      200  {object}  garageResponse
-// @Failure      500  {object}  apierr.APIError
-// @Router       /v1/garage [get]
+// @Failure      401  {object}  apierr.ErrorResponse
+// @Failure      500  {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /garage [get]
 func (h *GarageHandler) GetGarage(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -104,8 +106,6 @@ func (h *GarageHandler) GetGarage(c *gin.Context) {
 	})
 }
 
-// ── Collapse helpers ──────────────────────────────────────────────────────────
-
 // collapseVehicleRows turns the flat JOIN rows (one per vehicle+system) into
 // the nested vehicle → []systems shape the frontend expects.
 func collapseVehicleRows(rows []store.GetGarageVehiclesRow) []garageVehicle {
@@ -128,8 +128,6 @@ func collapseVehicleRows(rows []store.GetGarageVehiclesRow) []garageVehicle {
 				OpenRepairs: row.OpenRepairCount,
 				Systems:     []garageSystemSummary{},
 			}
-			// LastRepairAt is interface{} (scalar subquery) — pgx returns
-			// pgtype.Timestamptz at runtime. Type-assert to extract the date.
 			if row.LastRepairAt != nil {
 				if ts, ok := row.LastRepairAt.(pgtype.Timestamptz); ok && ts.Valid {
 					t := ts.Time.Format("2006-01-02")
@@ -140,7 +138,6 @@ func collapseVehicleRows(rows []store.GetGarageVehiclesRow) []garageVehicle {
 			vehicles = append(vehicles, v)
 		}
 
-		// SystemKey is *string — NULL for vehicles with no repairs.
 		if row.SystemKey != nil && *row.SystemKey != "" {
 			var repairCount int64
 			if v, ok := row.SystemRepairCount.(int64); ok {

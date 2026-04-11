@@ -1,3 +1,17 @@
+import type { components } from '../../shared/types'
+
+// Convenience aliases
+export type GarageResponse = components['schemas']['internal_handler.garageResponse']
+export type GarageVehicle  = components['schemas']['internal_handler.garageVehicle']
+export type GarageStats    = components['schemas']['internal_handler.garageStats']
+export type Vehicle        = components['schemas']['internal_handler.SwaggerVehicle']
+export type Repair         = components['schemas']['internal_handler.SwaggerRepair']
+export type RepairDetail   = components['schemas']['internal_handler.SwaggerRepairDetail']
+export type RepairStep     = components['schemas']['internal_handler.SwaggerRepairStep']
+export type Part           = components['schemas']['internal_handler.SwaggerPart']
+export type RepairNote     = components['schemas']['internal_handler.SwaggerRepairNote']
+export type SystemSummary  = components['schemas']['internal_handler.garageSystemSummary']
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -16,39 +30,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
     return res.json()
 }
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface SystemSummary {
-    id: string
-    label: string
-    repair_count: number
-    has_open: boolean
-}
-
-export interface GarageVehicle {
-    id: string
-    year: number
-    make: string
-    model: string
-    trim?: string
-    open_repairs: number
-    systems: SystemSummary[]
-}
-
-export interface GarageStats {
-    total_vehicles: number
-    open_repairs: number
-    repairs_30d: number
-    parts_spend_30d: number
-}
-
-export interface GarageResponse {
-    vehicles: GarageVehicle[]
-    stats: GarageStats
-}
-
-// ── Endpoints ─────────────────────────────────────────────────────────────────
 
 export const api = {
     garage: {

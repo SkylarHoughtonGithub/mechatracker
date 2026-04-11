@@ -5,6 +5,8 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 
 	"github.com/mechatracker/api/internal/apierr"
@@ -15,7 +17,6 @@ import (
 )
 
 // New builds and returns the configured Gin engine.
-// q is the sqlc Querier — passed in so main.go owns the DB pool lifecycle.
 func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
@@ -24,7 +25,11 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	r := gin.New()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowOrigins: []string{
+			"http://localhost:3000",
+			"http://localhost:8080",
+			"http://web.localhost:8080",
+		},
 		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: true,
@@ -38,6 +43,11 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 
 	r.GET("/health", handleHealth)
 	r.GET("/ready", handleReady)
+
+	// ── Swagger UI (non-production only) ─────────────────────
+	if !cfg.IsProduction() {
+		r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	// ── Handlers ─────────────────────────────────────────────
 	vh := handler.NewVehicleHandler(q, log)
@@ -69,8 +79,6 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	return r
 }
 
-// ── Health ────────────────────────────────────────────────────
-
 func handleHealth(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
@@ -78,8 +86,6 @@ func handleHealth(c *gin.Context) {
 func handleReady(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ready"})
 }
-
-// ── Route registration ────────────────────────────────────────
 
 func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v := rg.Group("/vehicles")

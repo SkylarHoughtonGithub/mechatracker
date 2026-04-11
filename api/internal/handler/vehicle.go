@@ -24,11 +24,16 @@ func NewVehicleHandler(q store.Querier, log *zap.Logger) *VehicleHandler {
 	return &VehicleHandler{q: q, log: log}
 }
 
-// ----------------------------------------------------------------
-// GET /v1/vehicles
-// Lists all vehicles belonging to the caller's org.
-// ----------------------------------------------------------------
-
+// List godoc
+// @Summary      List vehicles
+// @Description  Returns all vehicles belonging to the caller's org.
+// @Tags         vehicles
+// @Produce      json
+// @Success      200  {array}   SwaggerVehicle
+// @Failure      401  {object}  apierr.ErrorResponse
+// @Failure      500  {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles [get]
 func (h *VehicleHandler) List(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -45,10 +50,18 @@ func (h *VehicleHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, vehicles)
 }
 
-// ----------------------------------------------------------------
-// GET /v1/vehicles/:vehicleID
-// ----------------------------------------------------------------
-
+// Get godoc
+// @Summary      Get a vehicle
+// @Description  Returns a single vehicle by ID, scoped to the caller's org.
+// @Tags         vehicles
+// @Produce      json
+// @Param        vehicleID  path      string  true  "Vehicle UUID"  format(uuid)
+// @Success      200        {object}  SwaggerVehicle
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Failure      404        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID} [get]
 func (h *VehicleHandler) Get(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -71,20 +84,30 @@ func (h *VehicleHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, vehicle)
 }
 
-// ----------------------------------------------------------------
-// POST /v1/vehicles
-// ----------------------------------------------------------------
-
+// createVehicleReq is the request body for creating a vehicle.
 type createVehicleReq struct {
-	Year      int16   `json:"year"       binding:"required,min=1900,max=2100"`
-	Make      string  `json:"make"       binding:"required,max=100"`
-	Model     string  `json:"model"      binding:"required,max=100"`
-	Trim      *string `json:"trim"`
-	VIN       *string `json:"vin"        binding:"omitempty,len=17"`
-	Mileage   *int32  `json:"mileage"    binding:"omitempty,min=0"`
-	UnitLabel *string `json:"unit_label" binding:"omitempty,max=50"`
+	Year      int16   `json:"year"       binding:"required,min=1900,max=2100" example:"2019"`
+	Make      string  `json:"make"       binding:"required,max=100"           example:"Ford"`
+	Model     string  `json:"model"      binding:"required,max=100"           example:"F-150"`
+	Trim      *string `json:"trim"                                            example:"XLT"`
+	VIN       *string `json:"vin"        binding:"omitempty,len=17"           example:"1FTFW1ET5DFC10312"`
+	Mileage   *int32  `json:"mileage"    binding:"omitempty,min=0"            example:"84200"`
+	UnitLabel *string `json:"unit_label" binding:"omitempty,max=50"           example:"Unit #07"`
 }
 
+// Create godoc
+// @Summary      Create a vehicle
+// @Description  Adds a vehicle to the caller's org garage.
+// @Tags         vehicles
+// @Accept       json
+// @Produce      json
+// @Param        body  body      createVehicleReq  true  "Vehicle details"
+// @Success      201   {object}  SwaggerVehicle
+// @Failure      400   {object}  apierr.ErrorResponse
+// @Failure      401   {object}  apierr.ErrorResponse
+// @Failure      500   {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles [post]
 func (h *VehicleHandler) Create(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -116,21 +139,32 @@ func (h *VehicleHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, vehicle)
 }
 
-// ----------------------------------------------------------------
-// PATCH /v1/vehicles/:vehicleID
-// All fields optional — only provided fields are updated (sqlc narg).
-// ----------------------------------------------------------------
-
+// updateVehicleReq is the request body for updating a vehicle.
+// All fields are optional — only provided fields are updated.
 type updateVehicleReq struct {
-	Year      *int16  `json:"year"       binding:"omitempty,min=1900,max=2100"`
-	Make      *string `json:"make"       binding:"omitempty,max=100"`
-	Model     *string `json:"model"      binding:"omitempty,max=100"`
-	Trim      *string `json:"trim"`
+	Year      *int16  `json:"year"       binding:"omitempty,min=1900,max=2100" example:"2020"`
+	Make      *string `json:"make"       binding:"omitempty,max=100"           example:"Ford"`
+	Model     *string `json:"model"      binding:"omitempty,max=100"           example:"F-150"`
+	Trim      *string `json:"trim"                                            example:"Lariat"`
 	VIN       *string `json:"vin"        binding:"omitempty,len=17"`
-	Mileage   *int32  `json:"mileage"    binding:"omitempty,min=0"`
+	Mileage   *int32  `json:"mileage"    binding:"omitempty,min=0"            example:"92000"`
 	UnitLabel *string `json:"unit_label" binding:"omitempty,max=50"`
 }
 
+// Update godoc
+// @Summary      Update a vehicle
+// @Description  Partially updates a vehicle. Only provided fields are changed.
+// @Tags         vehicles
+// @Accept       json
+// @Produce      json
+// @Param        vehicleID  path      string            true  "Vehicle UUID"  format(uuid)
+// @Param        body       body      updateVehicleReq  true  "Fields to update"
+// @Success      200        {object}  SwaggerVehicle
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Failure      404        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID} [patch]
 func (h *VehicleHandler) Update(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -166,12 +200,18 @@ func (h *VehicleHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, vehicle)
 }
 
-// ----------------------------------------------------------------
-// DELETE /v1/vehicles/:vehicleID
-// Hard deletes the vehicle and writes a snapshot to deleted_items
-// so it can be recovered within 30 days.
-// ----------------------------------------------------------------
-
+// Delete godoc
+// @Summary      Delete a vehicle
+// @Description  Hard-deletes a vehicle and writes a 30-day recoverable snapshot to deleted_items.
+// @Tags         vehicles
+// @Produce      json
+// @Param        vehicleID  path      string  true  "Vehicle UUID"  format(uuid)
+// @Success      200        {object}  SwaggerDeletedResponse  "deleted: true, id: <uuid>"
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Failure      404        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID} [delete]
 func (h *VehicleHandler) Delete(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -186,7 +226,6 @@ func (h *VehicleHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// DeleteVehicle returns the deleted row — we snapshot it before it's gone.
 	deleted, err := h.q.DeleteVehicle(c.Request.Context(), store.DeleteVehicleParams{
 		ID:    vehicleID,
 		OrgID: orgID,
@@ -196,7 +235,6 @@ func (h *VehicleHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Write to deleted_items buffer (best-effort — log failure but don't 500).
 	snapshot, _ := json.Marshal(deleted)
 	if _, err := h.q.InsertDeletedItem(c.Request.Context(), store.InsertDeletedItemParams{
 		EntityType: "vehicle",
@@ -218,8 +256,6 @@ func (h *VehicleHandler) Delete(c *gin.Context) {
 // helpers — shared by all handlers in this package
 // ----------------------------------------------------------------
 
-// orgIDFromCtx reads the Clerk org_id set by middleware.Auth and
-// parses it as a UUID. Aborts with 401 if missing or malformed.
 func orgIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
 	raw := c.GetString(middleware.KeyOrgID)
 	if raw == "" {
@@ -256,8 +292,6 @@ func callerIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
 	return id, true
 }
 
-// parseUUIDParam parses a Gin URL parameter as a UUID.
-// Aborts with 400 if the value is not a valid UUID.
 func parseUUIDParam(c *gin.Context, param string) (uuid.UUID, bool) {
 	id, err := uuid.Parse(c.Param(param))
 	if err != nil {

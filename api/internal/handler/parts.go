@@ -22,18 +22,30 @@ func NewPartsHandler(q store.Querier, log *zap.Logger) *PartsHandler {
 	return &PartsHandler{q: q, log: log}
 }
 
-// ── POST /v1/repairs/:repairID/parts ─────────────────────────────────────────
-// Adds a part to a repair. Only allowed when status is draft or in_progress.
-// Cost is accepted as a decimal string e.g. "29.99" to avoid float precision issues.
-
+// createPartReq is the request body for adding a part to a repair.
 type createPartReq struct {
-	Name       string  `json:"name"        binding:"required,max=200"`
-	PartNumber *string `json:"part_number"`
-	Supplier   *string `json:"supplier"`
-	Cost       *string `json:"cost"`
+	Name       string  `json:"name"        binding:"required,max=200" example:"Brake pad set"`
+	PartNumber *string `json:"part_number"                            example:"D1060-8J090"`
+	Supplier   *string `json:"supplier"                               example:"RockAuto"`
+	Cost       *string `json:"cost"                                   example:"34.99"`
 	Notes      *string `json:"notes"`
 }
 
+// Create godoc
+// @Summary      Add a part to a repair
+// @Description  Creates a part entry on a repair, starting in `needed` status. Cost is a decimal string e.g. "34.99".
+// @Tags         parts
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string          true  "Repair UUID"  format(uuid)
+// @Param        body      body      createPartReq   true  "Part details"
+// @Success      201       {object}  SwaggerPart
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Failure      500       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/parts [post]
 func (h *PartsHandler) Create(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -74,7 +86,7 @@ func (h *PartsHandler) Create(c *gin.Context) {
 		Name:       req.Name,
 		PartNumber: req.PartNumber,
 		Supplier:   req.Supplier,
-		Status:     store.PartStatusNeeded, // always starts as needed
+		Status:     store.PartStatusNeeded,
 		Cost:       cost,
 		Notes:      req.Notes,
 	})
@@ -87,19 +99,30 @@ func (h *PartsHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, part)
 }
 
-// ── PATCH /v1/repairs/:repairID/parts/:partID ────────────────────────────────
-// Updates part fields (name, part_number, supplier, cost, notes).
-// Allowed on any non-completed repair so techs can update cost and supplier
-// while parts are being sourced.
-
+// updatePartReq is the request body for updating a part's fields.
 type updatePartReq struct {
-	Name       *string `json:"name"        binding:"omitempty,max=200"`
+	Name       *string `json:"name"        binding:"omitempty,max=200" example:"Brake pad set — premium"`
 	PartNumber *string `json:"part_number"`
-	Supplier   *string `json:"supplier"`
-	Cost       *string `json:"cost"`
+	Supplier   *string `json:"supplier"                                example:"NAPA"`
+	Cost       *string `json:"cost"                                    example:"49.99"`
 	Notes      *string `json:"notes"`
 }
 
+// Update godoc
+// @Summary      Update a part
+// @Description  Updates part fields (name, part_number, supplier, cost, notes). Allowed on any non-completed repair.
+// @Tags         parts
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string          true  "Repair UUID"  format(uuid)
+// @Param        partID    path      string          true  "Part UUID"    format(uuid)
+// @Param        body      body      updatePartReq   true  "Fields to update"
+// @Success      200       {object}  SwaggerPart
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/parts/{partID} [patch]
 func (h *PartsHandler) Update(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -156,16 +179,17 @@ func (h *PartsHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, part)
 }
 
-// ── PATCH /v1/repairs/:repairID/parts/:partID/status ─────────────────────────
-// Transitions a part through its lifecycle: needed → ordered → in_stock → installed.
-// Allowed on any non-completed repair.
+// updatePartStatusReq is the request body for advancing a part through its lifecycle.
+type updatePartStatusReq struct {
+	// Status must follow the allowed progression: needed → ordered → in_stock → installed.
+	Status string `json:"status" binding:"required,oneof=needed ordered in_stock installed" example:"ordered"`
+}
 
-// validPartTransitions defines the allowed part status progressions.
 var validPartTransitions = map[store.PartStatus][]store.PartStatus{
 	store.PartStatusNeeded:    {store.PartStatusOrdered, store.PartStatusInStock},
 	store.PartStatusOrdered:   {store.PartStatusInStock},
 	store.PartStatusInStock:   {store.PartStatusInstalled},
-	store.PartStatusInstalled: {}, // terminal
+	store.PartStatusInstalled: {},
 }
 
 func isValidPartTransition(from, to store.PartStatus) bool {
@@ -181,10 +205,21 @@ func isValidPartTransition(from, to store.PartStatus) bool {
 	return false
 }
 
-type updatePartStatusReq struct {
-	Status string `json:"status" binding:"required,oneof=needed ordered in_stock installed"`
-}
-
+// UpdateStatus godoc
+// @Summary      Advance a part's status
+// @Description  Transitions a part through its lifecycle: needed → ordered → in_stock → installed. Invalid transitions are rejected.
+// @Tags         parts
+// @Accept       json
+// @Produce      json
+// @Param        repairID  path      string                true  "Repair UUID"  format(uuid)
+// @Param        partID    path      string                true  "Part UUID"    format(uuid)
+// @Param        body      body      updatePartStatusReq   true  "New status"
+// @Success      200       {object}  SwaggerPart
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/parts/{partID}/status [patch]
 func (h *PartsHandler) UpdateStatus(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -219,7 +254,6 @@ func (h *PartsHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	// Fetch current parts to find the one we're updating and check current status.
 	parts, err := h.q.ListParts(c.Request.Context(), repairID)
 	if err != nil {
 		h.log.Error("ListParts for status check", zap.Error(err))
@@ -260,9 +294,19 @@ func (h *PartsHandler) UpdateStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, part)
 }
 
-// ── DELETE /v1/repairs/:repairID/parts/:partID ───────────────────────────────
-// Removes a part. Only allowed when status is draft or in_progress.
-
+// Delete godoc
+// @Summary      Delete a part
+// @Description  Removes a part from a repair. Only allowed when status is draft or in_progress.
+// @Tags         parts
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Param        partID    path      string  true  "Part UUID"    format(uuid)
+// @Success      200       {object}  SwaggerDeletedResponse  "deleted: true, id: <uuid>"
+// @Failure      400       {object}  apierr.ErrorResponse
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/parts/{partID} [delete]
 func (h *PartsHandler) Delete(c *gin.Context) {
 	orgID, ok := orgIDFromCtx(c)
 	if !ok {
@@ -310,7 +354,7 @@ func (h *PartsHandler) Delete(c *gin.Context) {
 func parseCost(c *gin.Context, cost *string) (pgtype.Numeric, bool) {
 	var n pgtype.Numeric
 	if cost == nil {
-		return n, true // null — no cost provided
+		return n, true
 	}
 	if err := n.Scan(*cost); err != nil {
 		apierr.BadRequest(c, "Invalid cost: must be a decimal number e.g. \"29.99\".")

@@ -1,0 +1,5 @@
+replace github.com/jackc/pgx/v5/pgtype.Numeric number
+replace github.com/jackc/pgx/v5/pgtype.UUID string
+replace github.com/jackc/pgx/v5/pgtype.Timestamptz string
+replace github.com/jackc/pgx/v5/pgtype.Text string
+replace github.com/shopspring/decimal.Decimal number
