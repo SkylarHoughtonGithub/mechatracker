@@ -57,6 +57,7 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
+	v1.Use(middleware.UserLookup(q, log))
 	{
 		registerVehicleRoutes(v1, vh)
 		registerRepairRoutes(v1, rh, ph)

@@ -5,6 +5,9 @@
 # Run: docker buildx build -f web/Dockerfile .
 FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
+ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+
 WORKDIR /app
 
 # Copy workspace manifests first for layer caching

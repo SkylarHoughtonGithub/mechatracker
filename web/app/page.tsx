@@ -1,6 +1,7 @@
 'use client'
 
 import { useGarage } from '@/lib/queries'
+import { UserButton } from '@clerk/nextjs'
 
 export default function HomePage() {
   const { data, isLoading, error } = useGarage()
@@ -10,6 +11,7 @@ export default function HomePage() {
 
   return (
     <main className="p-8">
+      <UserButton />
       <h1 className="text-2xl font-semibold mb-6">Garage</h1>
 
       <div className="grid grid-cols-4 gap-4 mb-8">
