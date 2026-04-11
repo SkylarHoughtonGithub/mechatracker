@@ -173,12 +173,14 @@ tasks:
  
   web:image:push:
     desc: "Build and push the web image to the local k3d registry"
+    dotenv: ['.env.build']
     # Build context is repo root so shared/ is accessible during build
     cmds:
       - |
         docker buildx build \
           --platform linux/arm64 \
           --file web/Dockerfile \
+          --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY} \
           --tag {{.WEB_IMAGE_PUSH}}:latest \
           --push \
           .
@@ -203,12 +205,12 @@ tasks:
   # ── Helm ─────────────────────────────────────────────────────────────────────
 
   helm:upgrade:
-    desc: "Install or upgrade the Helm release"
     cmds:
       - |
         helm upgrade --install mechatracker ./infra/helm/mechatracker \
           --namespace {{.K8S_NAMESPACE}} \
           --values ./infra/helm/mechatracker/values.dev.yaml \
+          --values ./infra/helm/mechatracker/values.dev.local.yaml \
           --set api.rollme="$(date +%s)" \
           --set web.rollme="$(date +%s)" \
           --wait --timeout 5m

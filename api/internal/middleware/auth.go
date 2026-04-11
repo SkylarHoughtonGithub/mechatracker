@@ -18,10 +18,11 @@ import (
 
 // Context keys — use these to read values downstream in handlers.
 const (
-	KeyUserID    = "user_id"    // Clerk user ID, e.g. "user_2abc..."
-	KeyOrgID     = "org_id"     // Clerk org ID, e.g. "org_2abc..." (may be empty)
-	KeyOrgRole   = "org_role"   // "org:admin" | "org:member" etc.
-	KeyRequestID = "request_id" // set by RequestID middleware
+	KeyInternalUserID = "internal_user_id" // Clerk user ID, e.g. "user_2abc..."
+	KeyUserID         = "user_id"          // Clerk user ID, e.g. "user_2abc..."
+	KeyOrgID          = "org_id"           // Clerk org ID, e.g. "org_2abc..." (may be empty)
+	KeyOrgRole        = "org_role"         // "org:admin" | "org:member" etc.
+	KeyRequestID      = "request_id"       // set by RequestID middleware
 )
 
 // clerkClaims maps the JWT claims issued by Clerk.
@@ -78,10 +79,15 @@ func Auth(cfg *config.Config, log *zap.Logger) gin.HandlerFunc {
 			return cache.getKey(kid)
 		}
 
-		token, err := jwt.ParseWithClaims(rawToken, &clerkClaims{}, keyFunc,
-			jwt.WithAudience(cfg.ClerkAudience),
+		opts := []jwt.ParserOption{
 			jwt.WithExpirationRequired(),
-		)
+		}
+		if cfg.ClerkAudience != "" {
+			opts = append(opts, jwt.WithAudience(cfg.ClerkAudience))
+		}
+
+		token, err := jwt.ParseWithClaims(rawToken, &clerkClaims{}, keyFunc, opts...)
+
 		if err != nil || !token.Valid {
 			log.Debug("JWT validation failed", zap.Error(err))
 			apierr.Unauthorized(c, "Invalid or expired token.")

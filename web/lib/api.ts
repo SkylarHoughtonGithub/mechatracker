@@ -1,6 +1,6 @@
+import { useAuth } from '@clerk/nextjs';
 import type { components } from '../../shared/types'
 
-// Convenience aliases
 export type GarageResponse = components['schemas']['internal_handler.garageResponse']
 export type GarageVehicle  = components['schemas']['internal_handler.garageVehicle']
 export type GarageStats    = components['schemas']['internal_handler.garageStats']
@@ -14,11 +14,12 @@ export type SystemSummary  = components['schemas']['internal_handler.garageSyste
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'
 
-async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-    const res = await fetch(`${API_URL}${path}`,{
+async function apiFetch<T>(path: string, token: string, init?: RequestInit): Promise<T> {
+    const res = await fetch(`${API_URL}${path}`, {
         ...init,
         headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
             ...init?.headers,
         },
     })
@@ -31,11 +32,23 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     return res.json()
 }
 
-export const api = {
-    garage: {
-        get: () => apiFetch<GarageResponse>('/v1/garage'),
-    },
-    vehicles: {
-        list: () => apiFetch<GarageVehicle[]>('/v1/vehicles'),
-    },
+// Hook that returns an API client with the Clerk token pre-attached.
+// Use this in components instead of importing `api` directly.
+export function useApi() {
+    const { getToken } = useAuth()
+
+    async function fetch<T>(path: string, init?: RequestInit): Promise<T> {
+        const token = await getToken()
+        if (!token) throw new Error('Not authenticated')
+        return apiFetch<T>(path, token, init)
+    }
+
+    return {
+        garage: {
+            get: () => fetch<GarageResponse>('/v1/garage'),
+        },
+        vehicles: {
+            list: () => fetch<Vehicle[]>('/v1/vehicles'),
+        },
+    }
 }

@@ -2,6 +2,7 @@
 .env
 .env.local
 .env.*.local
+.env.build
 
 # ── Go ────────────────────────────────────────────────────────────────────────
 api/bin/
@@ -19,6 +20,7 @@ out/
 # Downloaded chart dependencies — reproduced by `helm dependency update`
 infra/helm/mechatracker/charts/*.tgz
 infra/helm/mechatracker/Chart.lock
+infra/helm/mechatracker/values.dev.local.yaml
 
 # ── Terraform ─────────────────────────────────────────────────────────────────
 infra/terraform/.terraform/

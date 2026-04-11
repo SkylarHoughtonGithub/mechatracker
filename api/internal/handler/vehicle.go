@@ -279,9 +279,12 @@ func orgIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
 // internal UUID under a separate key (e.g. KeyInternalUserID), then read
 // that key here instead.
 func callerIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
-	raw := c.GetString(middleware.KeyUserID)
+	raw := c.GetString(middleware.KeyInternalUserID)
 	if raw == "" {
-		apierr.Unauthorized(c, "No User context.")
+		raw = c.GetString(middleware.KeyUserID)
+	}
+	if raw == "" {
+		apierr.Unauthorized(c, "No user context.")
 		return uuid.UUID{}, false
 	}
 	id, err := uuid.Parse(raw)

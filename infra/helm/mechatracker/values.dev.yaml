@@ -12,9 +12,9 @@ api:
     ENV: development
     PORT: "8080"
     DATABASE_URL: "postgres://mechatracker:mechatracker@mechatracker-postgresql:5432/mechatracker?sslmode=disable"
-    CLERK_DEV_BYPASS: "true"
-    CLERK_JWKS_URL: "http://unused-in-dev"
-    CLERK_AUDIENCE: "dev"
+    CLERK_DEV_BYPASS: "false"
+    CLERK_JWKS_URL: "https://daring-drake-86.clerk.accounts.dev/.well-known/jwks.json"
+    CLERK_AUDIENCE: ""
     SPACES_ENDPOINT: ""
     SPACES_BUCKET: ""
     SPACES_ACCESS_KEY: ""
@@ -55,7 +55,8 @@ web:
   env:
     # Points at the API via the in-cluster service name.
     # In-cluster requests go service-to-service — no ingress hop needed.
-    NEXT_PUBLIC_API_URL: "http://mechatracker-api:8080"
+    NEXT_PUBLIC_API_URL: "http://localhost:8080"
+    INTERNAL_API_URL: "http://mechatracker-api:8080"
 
   service:
     type: ClusterIP
