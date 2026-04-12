@@ -30,7 +30,7 @@ tasks:
   setup:tools:
     desc: "Install all dev dependencies via Homebrew and go install"
     cmds:
-      - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx
+      - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx libpq
       - go install github.com/vektra/mockery/v2@latest
       - go install github.com/swaggo/swag/cmd/swag@latest
       - npm install -g swagger2openapi openapi-typescript

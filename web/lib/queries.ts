@@ -26,3 +26,27 @@ export function useVehicleRepairs(vehicleId: string, system?: string) {
         enabled: !!vehicleId,
     })
 }
+
+export function useRepair(repairId: string) {
+    const api = useApi()
+    return useQuery({
+        queryKey: ['repair', repairId],
+        queryFn: () => api.repairs.get(repairId),
+        enabled: !!repairId,
+    })
+}
+
+export function useNotes(repairId: string) {
+    const api = useApi()
+    return useQuery({
+        queryKey: ['repair-notes', repairId],
+        queryFn: () => api.repairs.getNotes(repairId),
+        enabled: !!repairId,
+    })
+}
+
+export function useVehicleSystemLabel(vehicleId: string, systemId: string): string {
+    const { data: garage } = useGarage()
+    const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
+    return vehicle?.systems?.find(s => s.id === systemId)?.label ?? systemId
+}
