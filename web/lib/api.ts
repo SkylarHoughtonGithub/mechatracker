@@ -32,8 +32,6 @@ async function apiFetch<T>(path: string, token: string, init?: RequestInit): Pro
     return res.json()
 }
 
-// Hook that returns an API client with the Clerk token pre-attached.
-// Use this in components instead of importing `api` directly.
 export function useApi() {
     const { getToken } = useAuth()
 
@@ -49,6 +47,11 @@ export function useApi() {
         },
         vehicles: {
             list: () => fetch<Vehicle[]>('/v1/vehicles'),
+            get: (id: string) => fetch<Vehicle>(`/v1/vehicles/${id}`),
+            repairs: (id: string, system?: string) => {
+                const qs = system ? `?system=${encodeURIComponent(system)}` : ''
+                return fetch<Repair[]>(`/v1/vehicles/${id}/repairs${qs}`)
+            },
         },
     }
 }

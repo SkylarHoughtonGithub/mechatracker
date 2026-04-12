@@ -95,6 +95,7 @@ func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v.GET("/:vehicleID", h.Get)
 	v.PATCH("/:vehicleID", h.Update)
 	v.DELETE("/:vehicleID", h.Delete)
+	v.GET("/:vehicleID/repairs", h.ListRepairs)
 }
 
 func registerRepairRoutes(rg *gin.RouterGroup, h *handler.RepairHandler, ph *handler.PartsHandler) {

@@ -8,3 +8,21 @@ export function useGarage() {
         queryFn: api.garage.get,
     })
 }
+
+export function useVehicle(id: string) {
+    const api = useApi()
+    return useQuery({
+        queryKey: ['vehicle', id],
+        queryFn: () => api.vehicles.get(id),
+        enabled: !!id,
+    })
+}
+
+export function useVehicleRepairs(vehicleId: string, system?: string) {
+    const api = useApi()
+    return useQuery({
+        queryKey: ['vehicle-repairs', vehicleId, system],
+        queryFn: () => api.vehicles.repairs(vehicleId, system),
+        enabled: !!vehicleId,
+    })
+}
