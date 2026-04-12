@@ -104,6 +104,7 @@ func registerRepairRoutes(rg *gin.RouterGroup, h *handler.RepairHandler, ph *han
 	r.POST("", h.Create)
 	r.GET("/:repairID", h.Get)
 	r.PATCH("/:repairID", h.Update)
+	r.GET("/:repairID/notes", h.ListNotes)
 	r.POST("/:repairID/steps", h.CreateStep)
 	r.POST("/:repairID/steps/:stepID/complete", h.CompleteStep)
 	r.DELETE("/:repairID/steps/:stepID", h.DeleteStep)

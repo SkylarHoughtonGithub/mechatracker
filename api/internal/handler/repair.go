@@ -857,3 +857,45 @@ func repairIsEditable(status store.RepairStatus) bool {
 func uuidToPgtype(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
 }
+
+// Add to api/internal/handler/repair.go
+// (Insert after CreateNote handler)
+
+// ListNotes godoc
+// @Summary      List notes on a repair
+// @Description  Returns all timestamped notes for a repair, newest last.
+// @Tags         repairs
+// @Produce      json
+// @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
+// @Success      200       {array}   SwaggerRepairNote
+// @Failure      401       {object}  apierr.ErrorResponse
+// @Failure      404       {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /repairs/{repairID}/notes [get]
+func (h *RepairHandler) ListNotes(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	repairID, ok := parseUUIDParam(c, "repairID")
+	if !ok {
+		return
+	}
+
+	if _, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Repair not found.")
+		return
+	}
+
+	notes, err := h.q.ListNotes(c.Request.Context(), repairID)
+	if err != nil {
+		h.log.Error("ListNotes", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, notes)
+}
