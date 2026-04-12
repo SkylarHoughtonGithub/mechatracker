@@ -219,6 +219,67 @@ type updateRepairReq struct {
 	AssignedTo *string `json:"assigned_to" binding:"omitempty,uuid"`
 }
 
+// Add to api/internal/handler/vehicle.go
+// (Insert after the existing Delete handler, before the helper functions section)
+
+// ListRepairs godoc
+// @Summary      List repairs for a vehicle
+// @Description  Returns all repairs for a vehicle, optionally filtered by system.
+// @Tags         vehicles
+// @Produce      json
+// @Param        vehicleID  path      string  true   "Vehicle UUID"  format(uuid)
+// @Param        system     query     string  false  "Filter by system key (e.g. engine, brakes)"
+// @Success      200        {array}   SwaggerRepair
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Failure      404        {object}  apierr.ErrorResponse
+// @Failure      500        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID}/repairs [get]
+func (h *VehicleHandler) ListRepairs(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	vehicleID, ok := parseUUIDParam(c, "vehicleID")
+	if !ok {
+		return
+	}
+
+	// Verify the vehicle exists and belongs to this org
+	if _, err := h.q.GetVehicle(c.Request.Context(), store.GetVehicleParams{
+		ID:    vehicleID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Vehicle not found.")
+		return
+	}
+
+	repairs, err := h.q.ListRepairsByVehicle(c.Request.Context(), store.ListRepairsByVehicleParams{
+		VehicleID: vehicleID,
+		OrgID:     orgID,
+	})
+	if err != nil {
+		h.log.Error("ListRepairsByVehicle", zap.Error(err), zap.String("vehicle_id", vehicleID.String()))
+		apierr.Internal(c)
+		return
+	}
+
+	// Filter by system query param if provided
+	system := c.Query("system")
+	if system != "" {
+		filtered := repairs[:0]
+		for _, r := range repairs {
+			if r.System == system {
+				filtered = append(filtered, r)
+			}
+		}
+		repairs = filtered
+	}
+
+	c.JSON(http.StatusOK, repairs)
+}
+
 // Update godoc
 // @Summary      Update a repair
 // @Description  Handles two operations: status transition (provide `status`) or field edits (provide `title`/`system`/`assigned_to`). Completing a repair writes an immutable history snapshot.

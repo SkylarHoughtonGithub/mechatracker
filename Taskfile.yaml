@@ -288,6 +288,15 @@ tasks:
     cmds:
       - kubectl port-forward -n {{.K8S_NAMESPACE}} svc/mechatracker-postgresql 5432:5432
 
+  db:seed:user:
+    desc: "Upsert dev user clerk_id (run after any DB wipe)"
+    dotenv: ['api/.env']
+    cmds:
+      - |
+        psql "$DATABASE_URL" -c "
+          UPDATE users
+          SET clerk_id = '$CLERK_DEV_USER_ID'
+          WHERE id = '00000000-0000-0000-0000-000000000002';"
   # ── Code generation ──────────────────────────────────────────────────────────
 
   generate:
