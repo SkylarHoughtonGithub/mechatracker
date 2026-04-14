@@ -1007,6 +1007,53 @@ paths:
               schema:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
+  "/vehicles/{vehicleID}/history":
+    get:
+      security:
+        - BearerAuth: []
+      description: Returns completed repair snapshots from repair_history, ordered
+        newest first.
+      tags:
+        - vehicles
+      summary: List repair history for a vehicle
+      parameters:
+        - description: Vehicle UUID
+          name: vehicleID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/internal_handler.SwaggerRepairHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
   "/vehicles/{vehicleID}/repairs":
     get:
       security:
@@ -1287,6 +1334,43 @@ components:
         vehicle_id:
           type: string
           example: a44d8522-66b3-4146-af64-9db60c72470a
+    internal_handler.SwaggerRepairHistory:
+      type: object
+      properties:
+        archived_at:
+          type: string
+        assigned_snapshot:
+          type: string
+        assigned_to:
+          type: string
+        completed_at:
+          type: string
+        created_by:
+          type: string
+        id:
+          type: string
+        notes_snapshot: {}
+        org_id:
+          type: string
+        parts_snapshot: {}
+        repair_id:
+          type: string
+        resources_snapshot: {}
+        started_at:
+          type: string
+        steps_snapshot: {}
+        system:
+          type: string
+        title:
+          type: string
+        total_parts_cost:
+          type: number
+        total_steps:
+          type: integer
+        vehicle_id:
+          type: string
+        vehicle_snapshot:
+          type: string
     internal_handler.SwaggerRepairNote:
       type: object
       properties:

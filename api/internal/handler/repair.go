@@ -957,3 +957,46 @@ func (h *RepairHandler) ListNotes(c *gin.Context) {
 
 	c.JSON(http.StatusOK, notes)
 }
+
+// ListHistory godoc
+// @Summary      List repair history for a vehicle
+// @Description  Returns completed repair snapshots from repair_history, ordered newest first.
+// @Tags         vehicles
+// @Produce      json
+// @Param        vehicleID  path      string  true  "Vehicle UUID"  format(uuid)
+// @Success      200        {array}   SwaggerRepairHistory
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Failure      404        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID}/history [get]
+func (h *VehicleHandler) ListHistory(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	vehicleID, ok := parseUUIDParam(c, "vehicleID")
+	if !ok {
+		return
+	}
+
+	if _, err := h.q.GetVehicle(c.Request.Context(), store.GetVehicleParams{
+		ID:    vehicleID,
+		OrgID: orgID,
+	}); err != nil {
+		apierr.NotFound(c, "Vehicle not found.")
+		return
+	}
+
+	history, err := h.q.ListRepairHistory(c.Request.Context(), store.ListRepairHistoryParams{
+		OrgID:     orgID,
+		VehicleID: vehicleID,
+	})
+	if err != nil {
+		h.log.Error("ListRepairHistory", zap.Error(err), zap.String("vehicle_id", vehicleID.String()))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, history)
+}

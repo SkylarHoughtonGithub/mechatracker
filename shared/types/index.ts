@@ -1378,6 +1378,75 @@ export interface paths {
         };
         trace?: never;
     };
+    "/vehicles/{vehicleID}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repair history for a vehicle
+         * @description Returns completed repair snapshots from repair_history, ordered newest first.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Vehicle UUID */
+                    vehicleID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_handler.SwaggerRepairHistory"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/vehicles/{vehicleID}/repairs": {
         parameters: {
             query?: never;
@@ -1596,6 +1665,27 @@ export interface components {
             updated_at?: string;
             /** @example a44d8522-66b3-4146-af64-9db60c72470a */
             vehicle_id?: string;
+        };
+        "internal_handler.SwaggerRepairHistory": {
+            archived_at?: string;
+            assigned_snapshot?: string;
+            assigned_to?: string;
+            completed_at?: string;
+            created_by?: string;
+            id?: string;
+            notes_snapshot?: unknown;
+            org_id?: string;
+            parts_snapshot?: unknown;
+            repair_id?: string;
+            resources_snapshot?: unknown;
+            started_at?: string;
+            steps_snapshot?: unknown;
+            system?: string;
+            title?: string;
+            total_parts_cost?: number;
+            total_steps?: number;
+            vehicle_id?: string;
+            vehicle_snapshot?: string;
         };
         "internal_handler.SwaggerRepairNote": {
             /** @example Noticed scoring on the rotor. */
