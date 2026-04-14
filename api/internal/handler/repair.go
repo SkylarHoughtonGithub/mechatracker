@@ -376,6 +376,64 @@ func (h *RepairHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, repair)
 }
 
+// Delete godoc
+// @Summary     Delete a repair
+// @Description Hard-deletes a repair and writes a 30-day recoverable snapshot to deleted_items.
+// @Tags        repairs
+// @Produce     json
+// @Param       repairID path     string  true  "Repair UUID"  format(uuid)
+// @Success     200      {object} SwaggerDeletedResponse
+// @Failure     401      {object} apierr.ErrorResponse
+// @Failure     404      {object} apierr.ErrorResponse
+// @Security    BearerAuth
+// @Router      /repairs/{repairID} [delete]
+func (h *RepairHandler) Delete(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	repairID, ok := parseUUIDParam(c, "repairID")
+	if !ok {
+		return
+	}
+	callerID, ok := callerIDFromCtx(c)
+	if !ok {
+		return
+	}
+
+	repair, err := h.q.GetRepair(c.Request.Context(), store.GetRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	})
+	if err != nil {
+		apierr.NotFound(c, "Repair not found.")
+		return
+	}
+
+	// Snapshot before delete
+	snapshot, _ := json.Marshal(repair)
+	if _, err := h.q.InsertDeletedItem(c.Request.Context(), store.InsertDeletedItemParams{
+		EntityType: "repair",
+		EntityID:   repairID,
+		OrgID:      orgID,
+		DeletedBy:  callerID,
+		Snapshot:   snapshot,
+	}); err != nil {
+		h.log.Error("InsertDeletedItem before repair delete", zap.Error(err))
+	}
+
+	if err := h.q.DeleteRepair(c.Request.Context(), store.DeleteRepairParams{
+		ID:    repairID,
+		OrgID: orgID,
+	}); err != nil {
+		h.log.Error("DeleteRepair", zap.Error(err))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deleted": true, "id": repairID})
+}
+
 func (h *RepairHandler) writeRepairHistory(c *gin.Context, repair store.Repair, orgID uuid.UUID) error {
 	ctx := c.Request.Context()
 
@@ -830,7 +888,7 @@ var validTransitions = map[store.RepairStatus][]store.RepairStatus{
 	store.RepairStatusDraft:        {store.RepairStatusInProgress},
 	store.RepairStatusInProgress:   {store.RepairStatusPendingParts, store.RepairStatusCompleted},
 	store.RepairStatusPendingParts: {store.RepairStatusInProgress, store.RepairStatusCompleted},
-	store.RepairStatusCompleted:    {},
+	store.RepairStatusCompleted:    {store.RepairStatusInProgress},
 }
 
 func isValidTransition(from, to store.RepairStatus) bool {

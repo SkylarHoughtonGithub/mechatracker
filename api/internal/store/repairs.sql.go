@@ -65,6 +65,22 @@ func (q *Queries) CreateRepair(ctx context.Context, arg CreateRepairParams) (Rep
 	return i, err
 }
 
+const deleteRepair = `-- name: DeleteRepair :exec
+DELETE FROM repairs
+WHERE id = $1
+  AND org_id = $2
+`
+
+type DeleteRepairParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+func (q *Queries) DeleteRepair(ctx context.Context, arg DeleteRepairParams) error {
+	_, err := q.db.Exec(ctx, deleteRepair, arg.ID, arg.OrgID)
+	return err
+}
+
 const getRepair = `-- name: GetRepair :one
 
 SELECT r.id, r.vehicle_id, r.org_id, r.created_by, r.assigned_to, r.template_id, r.title, r.system, r.status, r.progress_pct, r.total_parts_cost, r.started_at, r.completed_at, r.created_at, r.updated_at FROM repairs r

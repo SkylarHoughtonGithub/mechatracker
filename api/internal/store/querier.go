@@ -25,6 +25,7 @@ type Querier interface {
 	CreateVehicle(ctx context.Context, arg CreateVehicleParams) (Vehicle, error)
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeletePart(ctx context.Context, arg DeletePartParams) error
+	DeleteRepair(ctx context.Context, arg DeleteRepairParams) error
 	DeleteStep(ctx context.Context, arg DeleteStepParams) error
 	// Returns the deleted row so the caller can snapshot it into deleted_items.
 	DeleteVehicle(ctx context.Context, arg DeleteVehicleParams) (Vehicle, error)

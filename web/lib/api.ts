@@ -87,6 +87,17 @@ export function useApi() {
           method: 'POST',
           body: JSON.stringify({ body }),
         }),
+
+      deleteRepair: (repairId: string) =>
+        fetchApi<{ deleted: Boolean; id: string }>(`/v1/repairs/${repairId}`, {
+          method: 'DELETE',
+        }),
+
+      reopen: (repairId: string) =>
+        fetchApi<Repair>(`/v1/repairs/${repairId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'in_progress' }),
+        }),
     },
   }
 }

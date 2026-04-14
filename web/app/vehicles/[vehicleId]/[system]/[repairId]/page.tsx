@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useRepair, useVehicleSystemLabel, useNotes } from '@/lib/queries'
 import { useApi, type RepairStep, type Part, type NoteWithAuthor } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
@@ -65,6 +65,9 @@ export default function RepairCardPage() {
   const [noteModalOpen,  setNoteModalOpen]  = useState(false)
   const [noteBody,       setNoteBody]       = useState('')
   const [submittingNote, setSubmittingNote] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const router = useRouter() // import from 'next/navigation'
 
   if (isLoading) return <LoadingState />
   if (error)     return <ErrorState message={(error as Error).message} />
@@ -122,6 +125,16 @@ export default function RepairCardPage() {
       setNoteModalOpen(false)
     } catch (e) { console.error(e) }
     finally { setSubmittingNote(false) }
+  }
+
+  async function deleteRepair() {
+    if (deleting) return
+    setDeleting(true)
+    try {
+      await api.repairs.deleteRepair(repairId)
+      router.push(`/vehicles/${vehicleId}/${system}`)
+    } catch (e) { console.error(e) }
+    finally { setDeleting(false) }
   }
 
   return (
@@ -297,14 +310,12 @@ export default function RepairCardPage() {
           title="Notes"
           count={notes && notes.length > 0 ? `${notes.length}` : undefined}
           action={
-            !isCompleted ? (
               <button
                 onClick={() => setNoteModalOpen(true)}
                 className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
               >
                 + Add note
               </button>
-            ) : undefined
           }
         >
           {notesLoading ? (
@@ -369,20 +380,65 @@ export default function RepairCardPage() {
         )}
 
         {isCompleted && (
-          <div className="rounded-xl border border-green-900 bg-green-950/50 px-4 py-4 text-center">
-            <div className="text-green-400 font-medium text-sm">Repair completed</div>
-            {repair.completed_at && (
-              <div className="text-green-600 text-xs mt-0.5">
-                {new Date(repair.completed_at).toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}
-              </div>
-            )}
+          <div className="space-y-2">
+            <div className="rounded-xl border border-green-900 bg-green-950/50 px-4 py-4 text-center">
+              <div className="text-green-400 font-medium text-sm">Repair completed</div>
+              {repair.completed_at && (
+                <div className="text-green-600 text-xs mt-0.5">
+                  {new Date(repair.completed_at).toLocaleDateString([], {
+                    month: 'long', day: 'numeric', year: 'numeric',
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => transitionRepair('in_progress')}
+                disabled={transitioning}
+                className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-50 font-medium text-sm py-3 rounded-xl transition-colors"
+              >
+                {transitioning ? 'Reopening…' : 'Reopen repair'}
+              </button>
+              <button
+                onClick={() => setDeleteModalOpen(true)}
+                className="border border-red-900 text-red-500 hover:bg-red-950 font-medium text-sm py-3 px-4 rounded-xl transition-colors"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         )}
 
       </div>
 
       {/* ── Floating note button ── */}
-      {!isCompleted && !noteModalOpen && (
+      {deleteModalOpen && (
+        <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteModalOpen(false)} />
+          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl mx-0 sm:mx-4 p-5">
+            <h2 className="text-base font-semibold text-zinc-100 mb-2">Delete repair?</h2>
+            <p className="text-sm text-zinc-500 mb-6">
+              This repair will be recoverable for 30 days. This action cannot be undone from the app.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeleteModalOpen(false)}
+                className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={deleteRepair}
+                disabled={deleting}
+                className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-medium text-sm py-2.5 rounded-xl transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete repair'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!noteModalOpen && (
         <button
           onClick={() => setNoteModalOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full shadow-xl border border-zinc-700 flex items-center justify-center transition-colors z-20"
