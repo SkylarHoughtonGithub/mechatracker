@@ -211,6 +211,43 @@ definitions:
         example: a44d8522-66b3-4146-af64-9db60c72470a
         type: string
     type: object
+  internal_handler.SwaggerRepairHistory:
+    properties:
+      archived_at:
+        type: string
+      assigned_snapshot:
+        type: string
+      assigned_to:
+        type: string
+      completed_at:
+        type: string
+      created_by:
+        type: string
+      id:
+        type: string
+      notes_snapshot: {}
+      org_id:
+        type: string
+      parts_snapshot: {}
+      repair_id:
+        type: string
+      resources_snapshot: {}
+      started_at:
+        type: string
+      steps_snapshot: {}
+      system:
+        type: string
+      title:
+        type: string
+      total_parts_cost:
+        type: number
+      total_steps:
+        type: integer
+      vehicle_id:
+        type: string
+      vehicle_snapshot:
+        type: string
+    type: object
   internal_handler.SwaggerRepairNote:
     properties:
       body:
@@ -652,6 +689,36 @@ paths:
       tags:
       - repairs
   /repairs/{repairID}:
+    delete:
+      description: Hard-deletes a repair and writes a 30-day recoverable snapshot
+        to deleted_items.
+      parameters:
+      - description: Repair UUID
+        format: uuid
+        in: path
+        name: repairID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/internal_handler.SwaggerDeletedResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a repair
+      tags:
+      - repairs
     get:
       description: Returns the repair record with its steps and parts in one response.
       parameters:
@@ -733,6 +800,37 @@ paths:
       tags:
       - repairs
   /repairs/{repairID}/notes:
+    get:
+      description: Returns all timestamped notes for a repair, newest last.
+      parameters:
+      - description: Repair UUID
+        format: uuid
+        in: path
+        name: repairID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handler.SwaggerRepairNote'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List notes on a repair
+      tags:
+      - repairs
     post:
       consumes:
       - application/json
@@ -1304,6 +1402,87 @@ paths:
       security:
       - BearerAuth: []
       summary: Update a vehicle
+      tags:
+      - vehicles
+  /vehicles/{vehicleID}/history:
+    get:
+      description: Returns completed repair snapshots from repair_history, ordered
+        newest first.
+      parameters:
+      - description: Vehicle UUID
+        format: uuid
+        in: path
+        name: vehicleID
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handler.SwaggerRepairHistory'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List repair history for a vehicle
+      tags:
+      - vehicles
+  /vehicles/{vehicleID}/repairs:
+    get:
+      description: Returns all repairs for a vehicle, optionally filtered by system.
+      parameters:
+      - description: Vehicle UUID
+        format: uuid
+        in: path
+        name: vehicleID
+        required: true
+        type: string
+      - description: Filter by system key (e.g. engine, brakes)
+        in: query
+        name: system
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_handler.SwaggerRepair'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List repairs for a vehicle
       tags:
       - vehicles
 securityDefinitions:

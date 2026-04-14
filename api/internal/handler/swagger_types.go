@@ -104,3 +104,26 @@ type SwaggerStepToggleResponse struct {
 	Step   SwaggerRepairStep `json:"step"`
 	Repair SwaggerRepair     `json:"repair"`
 }
+
+// SwaggerRepairHistory is the OpenAPI representation of store.RepairHistory.
+type SwaggerRepairHistory struct {
+	ID                string      `json:"id"`
+	RepairID          string      `json:"repair_id"`
+	VehicleID         string      `json:"vehicle_id"`
+	OrgID             string      `json:"org_id"`
+	CreatedBy         string      `json:"created_by"`
+	AssignedTo        *string     `json:"assigned_to"`
+	VehicleSnapshot   string      `json:"vehicle_snapshot"`
+	AssignedSnapshot  *string     `json:"assigned_snapshot"`
+	Title             string      `json:"title"`
+	System            string      `json:"system"`
+	TotalPartsCost    float64     `json:"total_parts_cost"`
+	TotalSteps        int16       `json:"total_steps"`
+	StepsSnapshot     interface{} `json:"steps_snapshot"`
+	PartsSnapshot     interface{} `json:"parts_snapshot"`
+	NotesSnapshot     interface{} `json:"notes_snapshot"`
+	ResourcesSnapshot interface{} `json:"resources_snapshot"`
+	StartedAt         *string     `json:"started_at"`
+	CompletedAt       string      `json:"completed_at"`
+	ArchivedAt        string      `json:"archived_at"`
+}

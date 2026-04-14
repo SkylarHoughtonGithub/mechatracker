@@ -245,7 +245,51 @@ export interface paths {
         };
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete a repair
+         * @description Hard-deletes a repair and writes a 30-day recoverable snapshot to deleted_items.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repair UUID */
+                    repairID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_handler.SwaggerDeletedResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+            };
+        };
         options?: never;
         head?: never;
         /**
@@ -316,7 +360,51 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List notes on a repair
+         * @description Returns all timestamped notes for a repair, newest last.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Repair UUID */
+                    repairID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_handler.SwaggerRepairNote"][];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+            };
+        };
         put?: never;
         /**
          * Add a note to a repair
@@ -1290,6 +1378,156 @@ export interface paths {
         };
         trace?: never;
     };
+    "/vehicles/{vehicleID}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repair history for a vehicle
+         * @description Returns completed repair snapshots from repair_history, ordered newest first.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Vehicle UUID */
+                    vehicleID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_handler.SwaggerRepairHistory"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/vehicles/{vehicleID}/repairs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List repairs for a vehicle
+         * @description Returns all repairs for a vehicle, optionally filtered by system.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Filter by system key (e.g. engine, brakes) */
+                    system?: string;
+                };
+                header?: never;
+                path: {
+                    /** @description Vehicle UUID */
+                    vehicleID: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["internal_handler.SwaggerRepair"][];
+                    };
+                };
+                /** @description Bad Request */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Unauthorized */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Not Found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+                /** @description Internal Server Error */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["github_com_mechatracker_api_internal_apierr.ErrorResponse"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1427,6 +1665,27 @@ export interface components {
             updated_at?: string;
             /** @example a44d8522-66b3-4146-af64-9db60c72470a */
             vehicle_id?: string;
+        };
+        "internal_handler.SwaggerRepairHistory": {
+            archived_at?: string;
+            assigned_snapshot?: string;
+            assigned_to?: string;
+            completed_at?: string;
+            created_by?: string;
+            id?: string;
+            notes_snapshot?: unknown;
+            org_id?: string;
+            parts_snapshot?: unknown;
+            repair_id?: string;
+            resources_snapshot?: unknown;
+            started_at?: string;
+            steps_snapshot?: unknown;
+            system?: string;
+            title?: string;
+            total_parts_cost?: number;
+            total_steps?: number;
+            vehicle_id?: string;
+            vehicle_snapshot?: string;
         };
         "internal_handler.SwaggerRepairNote": {
             /** @example Noticed scoring on the rotor. */

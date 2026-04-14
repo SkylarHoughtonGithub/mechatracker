@@ -160,6 +160,43 @@ paths:
               schema:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
+    delete:
+      security:
+        - BearerAuth: []
+      description: Hard-deletes a repair and writes a 30-day recoverable snapshot to
+        deleted_items.
+      tags:
+        - repairs
+      summary: Delete a repair
+      parameters:
+        - description: Repair UUID
+          name: repairID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/internal_handler.SwaggerDeletedResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
     patch:
       security:
         - BearerAuth: []
@@ -213,6 +250,44 @@ paths:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
   "/repairs/{repairID}/notes":
+    get:
+      security:
+        - BearerAuth: []
+      description: Returns all timestamped notes for a repair, newest last.
+      tags:
+        - repairs
+      summary: List notes on a repair
+      parameters:
+        - description: Repair UUID
+          name: repairID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/internal_handler.SwaggerRepairNote"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
     post:
       security:
         - BearerAuth: []
@@ -932,6 +1007,111 @@ paths:
               schema:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
+  "/vehicles/{vehicleID}/history":
+    get:
+      security:
+        - BearerAuth: []
+      description: Returns completed repair snapshots from repair_history, ordered
+        newest first.
+      tags:
+        - vehicles
+      summary: List repair history for a vehicle
+      parameters:
+        - description: Vehicle UUID
+          name: vehicleID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/internal_handler.SwaggerRepairHistory"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+  "/vehicles/{vehicleID}/repairs":
+    get:
+      security:
+        - BearerAuth: []
+      description: Returns all repairs for a vehicle, optionally filtered by system.
+      tags:
+        - vehicles
+      summary: List repairs for a vehicle
+      parameters:
+        - description: Vehicle UUID
+          name: vehicleID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - description: Filter by system key (e.g. engine, brakes)
+          name: system
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/internal_handler.SwaggerRepair"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
 servers:
   - url: //localhost:8080/v1
 components:
@@ -1154,6 +1334,43 @@ components:
         vehicle_id:
           type: string
           example: a44d8522-66b3-4146-af64-9db60c72470a
+    internal_handler.SwaggerRepairHistory:
+      type: object
+      properties:
+        archived_at:
+          type: string
+        assigned_snapshot:
+          type: string
+        assigned_to:
+          type: string
+        completed_at:
+          type: string
+        created_by:
+          type: string
+        id:
+          type: string
+        notes_snapshot: {}
+        org_id:
+          type: string
+        parts_snapshot: {}
+        repair_id:
+          type: string
+        resources_snapshot: {}
+        started_at:
+          type: string
+        steps_snapshot: {}
+        system:
+          type: string
+        title:
+          type: string
+        total_parts_cost:
+          type: number
+        total_steps:
+          type: integer
+        vehicle_id:
+          type: string
+        vehicle_snapshot:
+          type: string
     internal_handler.SwaggerRepairNote:
       type: object
       properties:

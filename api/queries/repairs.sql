@@ -97,3 +97,8 @@ SELECT * FROM repair_history
 WHERE org_id = $1
   AND vehicle_id = $2
 ORDER BY completed_at DESC;
+
+-- name: DeleteRepair :exec
+DELETE FROM repairs
+WHERE id = $1
+  AND org_id = $2;

@@ -207,6 +207,51 @@ const docTemplate = `{
                     }
                 }
             },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hard-deletes a repair and writes a 30-day recoverable snapshot to deleted_items.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repairs"
+                ],
+                "summary": "Delete a repair",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Repair UUID",
+                        "name": "repairID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/internal_handler.SwaggerDeletedResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "patch": {
                 "security": [
                     {
@@ -272,6 +317,54 @@ const docTemplate = `{
             }
         },
         "/repairs/{repairID}/notes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all timestamped notes for a repair, newest last.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "repairs"
+                ],
+                "summary": "List notes on a repair",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Repair UUID",
+                        "name": "repairID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handler.SwaggerRepairNote"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "post": {
                 "security": [
                     {
@@ -1139,6 +1232,130 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/vehicles/{vehicleID}/history": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns completed repair snapshots from repair_history, ordered newest first.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicles"
+                ],
+                "summary": "List repair history for a vehicle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Vehicle UUID",
+                        "name": "vehicleID",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handler.SwaggerRepairHistory"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vehicles/{vehicleID}/repairs": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Returns all repairs for a vehicle, optionally filtered by system.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicles"
+                ],
+                "summary": "List repairs for a vehicle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Vehicle UUID",
+                        "name": "vehicleID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by system key (e.g. engine, brakes)",
+                        "name": "system",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/internal_handler.SwaggerRepair"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -1432,6 +1649,60 @@ const docTemplate = `{
                 "vehicle_id": {
                     "type": "string",
                     "example": "a44d8522-66b3-4146-af64-9db60c72470a"
+                }
+            }
+        },
+        "internal_handler.SwaggerRepairHistory": {
+            "type": "object",
+            "properties": {
+                "archived_at": {
+                    "type": "string"
+                },
+                "assigned_snapshot": {
+                    "type": "string"
+                },
+                "assigned_to": {
+                    "type": "string"
+                },
+                "completed_at": {
+                    "type": "string"
+                },
+                "created_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "notes_snapshot": {},
+                "org_id": {
+                    "type": "string"
+                },
+                "parts_snapshot": {},
+                "repair_id": {
+                    "type": "string"
+                },
+                "resources_snapshot": {},
+                "started_at": {
+                    "type": "string"
+                },
+                "steps_snapshot": {},
+                "system": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_parts_cost": {
+                    "type": "number"
+                },
+                "total_steps": {
+                    "type": "integer"
+                },
+                "vehicle_id": {
+                    "type": "string"
+                },
+                "vehicle_snapshot": {
+                    "type": "string"
                 }
             }
         },

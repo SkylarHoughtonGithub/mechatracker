@@ -11,6 +11,7 @@ export type RepairStep     = components['schemas']['internal_handler.SwaggerRepa
 export type Part           = components['schemas']['internal_handler.SwaggerPart']
 export type RepairNote     = components['schemas']['internal_handler.SwaggerRepairNote']
 export type SystemSummary  = components['schemas']['internal_handler.garageSystemSummary']
+export type RepairHistory  = components['schemas']['internal_handler.SwaggerRepairHistory']
 
 export type NoteWithAuthor = RepairNote & { author_name?: string }
 
@@ -55,6 +56,8 @@ export function useApi() {
         const qs = system ? `?system=${encodeURIComponent(system)}` : ''
         return fetchApi<Repair[]>(`/v1/vehicles/${id}/repairs${qs}`)
       },
+      history: (id: string) =>
+        fetchApi<RepairHistory[]>(`/v1/vehicles/${id}/history`),
     },
 
     repairs: {
@@ -86,6 +89,17 @@ export function useApi() {
         fetchApi<RepairNote>(`/v1/repairs/${repairId}/notes`, {
           method: 'POST',
           body: JSON.stringify({ body }),
+        }),
+
+      deleteRepair: (repairId: string) =>
+        fetchApi<{ deleted: Boolean; id: string }>(`/v1/repairs/${repairId}`, {
+          method: 'DELETE',
+        }),
+
+      reopen: (repairId: string) =>
+        fetchApi<Repair>(`/v1/repairs/${repairId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'in_progress' }),
         }),
     },
   }

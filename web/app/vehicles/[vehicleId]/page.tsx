@@ -37,7 +37,7 @@ export default function VehiclePage() {
     <main className="p-8 max-w-2xl">
       <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-6">
         <Link href="/" className="hover:text-gray-700">Garage</Link>
-        <span>›</span>
+        <span></span>
         <span className="text-gray-700">{label}</span>
       </nav>
 
@@ -56,6 +56,13 @@ export default function VehiclePage() {
       </div>
 
       <h2 className="text-sm font-medium text-gray-500 mb-3">Systems</h2>
+
+      <Link
+        href={`/vehicles/${vehicleId}/history`}
+        className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors mb-3"
+      >
+        View repair history →
+      </Link>
 
       {(!vehicle.systems || vehicle.systems.length === 0) ? (
         <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">

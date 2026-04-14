@@ -50,3 +50,12 @@ export function useVehicleSystemLabel(vehicleId: string, systemId: string): stri
     const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
     return vehicle?.systems?.find(s => s.id === systemId)?.label ?? systemId
 }
+
+export function useVehicleHistory(vehicleId: string) {
+    const api = useApi()
+    return useQuery({
+        queryKey: ['vehicle-history', vehicleId],
+        queryFn: () => api.vehicles.history(vehicleId),
+        enabled: !!vehicleId,
+    })
+}
