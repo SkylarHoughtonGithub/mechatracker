@@ -7,8 +7,6 @@ import { useRepair, useVehicleSystemLabel, useNotes } from '@/lib/queries'
 import { useApi, type RepairStep, type Part, type NoteWithAuthor } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 
-// ── Status helpers ────────────────────────────────────────────────────────────
-
 const REPAIR_STATUS_LABEL: Record<string, string> = {
   draft:         'Draft',
   in_progress:   'In progress',
@@ -44,8 +42,6 @@ const PART_STATUS_STYLE: Record<string, string> = {
   installed: 'bg-green-950 text-green-400',
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
 export default function RepairCardPage() {
   const params = useParams()
   const vehicleId = params.vehicleId as string
@@ -59,15 +55,17 @@ export default function RepairCardPage() {
   const api = useApi()
   const qc  = useQueryClient()
 
-  const [togglingStep,   setTogglingStep]   = useState<string | null>(null)
-  const [advancingPart,  setAdvancingPart]  = useState<string | null>(null)
-  const [transitioning,  setTransitioning]  = useState(false)
-  const [noteModalOpen,  setNoteModalOpen]  = useState(false)
-  const [noteBody,       setNoteBody]       = useState('')
-  const [submittingNote, setSubmittingNote] = useState(false)
+  const [togglingStep,    setTogglingStep]    = useState<string | null>(null)
+  const [advancingPart,   setAdvancingPart]   = useState<string | null>(null)
+  const [transitioning,   setTransitioning]   = useState(false)
+  const [noteModalOpen,   setNoteModalOpen]   = useState(false)
+  const [noteBody,        setNoteBody]        = useState('')
+  const [submittingNote,  setSubmittingNote]  = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const router = useRouter() // import from 'next/navigation'
+  const [deleting,        setDeleting]        = useState(false)
+  const [stepModalOpen,   setStepModalOpen]   = useState(false)
+  const [partModalOpen,   setPartModalOpen]   = useState(false)
+  const router = useRouter()
 
   if (isLoading) return <LoadingState />
   if (error)     return <ErrorState message={(error as Error).message} />
@@ -83,6 +81,7 @@ export default function RepairCardPage() {
   const canStart    = status === 'draft'
   const canComplete = status === 'in_progress' || status === 'pending_parts'
   const isCompleted = status === 'completed'
+  const isEditable  = status === 'draft' || status === 'in_progress'
 
   async function toggleStep(stepId: string, currentlyDone: boolean) {
     if (togglingStep) return
@@ -139,7 +138,6 @@ export default function RepairCardPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      {/* ── Header ── */}
       <header className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-3 flex-wrap">
@@ -186,7 +184,6 @@ export default function RepairCardPage() {
 
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-3">
 
-        {/* ── Start repair CTA ── */}
         {canStart && (
           <button
             onClick={() => transitionRepair('in_progress')}
@@ -197,13 +194,27 @@ export default function RepairCardPage() {
           </button>
         )}
 
-        {/* ── Steps ── */}
-        {steps.length > 0 && (
-          <Section
-            title="Steps"
-            count={`${doneSteps}/${totalSteps}`}
-            accent={doneSteps === totalSteps && totalSteps > 0}
-          >
+        {/* Steps section */}
+        <Section
+          title="Steps"
+          count={totalSteps > 0 ? `${doneSteps}/${totalSteps}` : undefined}
+          accent={doneSteps === totalSteps && totalSteps > 0}
+          action={
+            isEditable ? (
+              <button
+                onClick={() => setStepModalOpen(true)}
+                className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+              >
+                + Add step
+              </button>
+            ) : undefined
+          }
+        >
+          {steps.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-zinc-600 text-center">
+              No steps yet.{isEditable && ' Tap "+ Add step" to build out the procedure.'}
+            </div>
+          ) : (
             <div className="divide-y divide-zinc-800">
               {steps.map((step, i) => (
                 <button
@@ -243,79 +254,95 @@ export default function RepairCardPage() {
                 </button>
               ))}
             </div>
-          </Section>
-        )}
+          )}
+        </Section>
 
-        {/* ── Parts ── */}
-        {parts.length > 0 && (
-          <Section
-            title="Parts"
-            count={`${parts.filter(p => p.status === 'installed').length}/${parts.length} installed`}
-          >
-            <div className="divide-y divide-zinc-800">
-              {parts.map(part => {
-                const pStatus    = part.status ?? 'needed'
-                const isInstalled = pStatus === 'installed'
-                const isAdvancing = advancingPart === part.id
-                return (
-                  <button
-                    key={part.id}
-                    onClick={() => advancePart(part.id!, pStatus)}
-                    disabled={isInstalled || !!advancingPart || isCompleted}
-                    className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors
-                      ${isInstalled ? 'opacity-40' : 'hover:bg-zinc-800/50'}
-                      ${isAdvancing ? 'opacity-40' : ''}`}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${isInstalled ? 'text-zinc-600 line-through' : 'text-zinc-100'}`}>
-                        {part.name}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {part.part_number && (
-                          <span className="text-xs text-zinc-500 font-mono">{part.part_number}</span>
+        {/* Parts section */}
+        <Section
+          title="Parts"
+          count={parts.length > 0 ? `${parts.filter(p => p.status === 'installed').length}/${parts.length} installed` : undefined}
+          action={
+            isEditable ? (
+              <button
+                onClick={() => setPartModalOpen(true)}
+                className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+              >
+                + Add part
+              </button>
+            ) : undefined
+          }
+        >
+          {parts.length === 0 ? (
+            <div className="px-4 py-6 text-sm text-zinc-600 text-center">
+              No parts yet.{isEditable && ' Tap "+ Add part" to track what you need.'}
+            </div>
+          ) : (
+            <>
+              <div className="divide-y divide-zinc-800">
+                {parts.map(part => {
+                  const pStatus     = part.status ?? 'needed'
+                  const isInstalled = pStatus === 'installed'
+                  const isAdvancing = advancingPart === part.id
+                  return (
+                    <button
+                      key={part.id}
+                      onClick={() => advancePart(part.id!, pStatus)}
+                      disabled={isInstalled || !!advancingPart || isCompleted}
+                      className={`w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors
+                        ${isInstalled ? 'opacity-40' : 'hover:bg-zinc-800/50'}
+                        ${isAdvancing ? 'opacity-40' : ''}`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${isInstalled ? 'text-zinc-600 line-through' : 'text-zinc-100'}`}>
+                          {part.name}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {part.part_number && (
+                            <span className="text-xs text-zinc-500 font-mono">{part.part_number}</span>
+                          )}
+                          {part.supplier && (
+                            <span className="text-xs text-zinc-600">{part.supplier}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {(part.cost ?? 0) > 0 && (
+                          <span className="text-xs text-zinc-400 font-medium">${part.cost}</span>
                         )}
-                        {part.supplier && (
-                          <span className="text-xs text-zinc-600">{part.supplier}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PART_STATUS_STYLE[pStatus] ?? PART_STATUS_STYLE.needed}`}>
+                          {PART_STATUS_LABEL[pStatus] ?? pStatus}
+                        </span>
+                        {!isInstalled && (
+                          <svg className="w-3.5 h-3.5 text-zinc-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
                         )}
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {(part.cost ?? 0) > 0 && (
-                        <span className="text-xs text-zinc-400 font-medium">${part.cost}</span>
-                      )}
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${PART_STATUS_STYLE[pStatus] ?? PART_STATUS_STYLE.needed}`}>
-                        {PART_STATUS_LABEL[pStatus] ?? pStatus}
-                      </span>
-                      {!isInstalled && (
-                        <svg className="w-3.5 h-3.5 text-zinc-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-            {(repair.total_parts_cost ?? 0) > 0 && (
-              <div className="px-4 py-3 border-t border-zinc-800 flex justify-between text-sm">
-                <span className="text-zinc-500">Total parts cost</span>
-                <span className="font-semibold text-zinc-100">${repair.total_parts_cost}</span>
+                    </button>
+                  )
+                })}
               </div>
-            )}
-          </Section>
-        )}
+              {(repair.total_parts_cost ?? 0) > 0 && (
+                <div className="px-4 py-3 border-t border-zinc-800 flex justify-between text-sm">
+                  <span className="text-zinc-500">Total parts cost</span>
+                  <span className="font-semibold text-zinc-100">${repair.total_parts_cost}</span>
+                </div>
+              )}
+            </>
+          )}
+        </Section>
 
-        {/* ── Notes ── */}
+        {/* Notes section */}
         <Section
           title="Notes"
           count={notes && notes.length > 0 ? `${notes.length}` : undefined}
           action={
-              <button
-                onClick={() => setNoteModalOpen(true)}
-                className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
-              >
-                + Add note
-              </button>
+            <button
+              onClick={() => setNoteModalOpen(true)}
+              className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors"
+            >
+              + Add note
+            </button>
           }
         >
           {notesLoading ? (
@@ -348,7 +375,7 @@ export default function RepairCardPage() {
           )}
         </Section>
 
-        {/* ── Status transitions ── */}
+        {/* Status transitions */}
         {canComplete && !isCompleted && (
           <div className="flex gap-2 pt-1">
             {status === 'in_progress' && (
@@ -408,37 +435,10 @@ export default function RepairCardPage() {
             </div>
           </div>
         )}
-
       </div>
 
-      {/* ── Floating note button ── */}
-      {deleteModalOpen && (
-        <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setDeleteModalOpen(false)} />
-          <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl mx-0 sm:mx-4 p-5">
-            <h2 className="text-base font-semibold text-zinc-100 mb-2">Delete repair?</h2>
-            <p className="text-sm text-zinc-500 mb-6">
-              This repair will be recoverable for 30 days. This action cannot be undone from the app.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setDeleteModalOpen(false)}
-                className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={deleteRepair}
-                disabled={deleting}
-                className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-medium text-sm py-2.5 rounded-xl transition-colors"
-              >
-                {deleting ? 'Deleting…' : 'Delete repair'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {!noteModalOpen && (
+      {/* Floating note button */}
+      {!noteModalOpen && !stepModalOpen && !partModalOpen && (
         <button
           onClick={() => setNoteModalOpen(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-zinc-800 hover:bg-zinc-700 text-white rounded-full shadow-xl border border-zinc-700 flex items-center justify-center transition-colors z-20"
@@ -450,7 +450,14 @@ export default function RepairCardPage() {
         </button>
       )}
 
-      {/* ── Note modal ── */}
+      {deleteModalOpen && (
+        <ConfirmDeleteModal
+          onClose={() => setDeleteModalOpen(false)}
+          onConfirm={deleteRepair}
+          confirming={deleting}
+        />
+      )}
+
       {noteModalOpen && (
         <NoteModal
           body={noteBody}
@@ -460,11 +467,276 @@ export default function RepairCardPage() {
           submitting={submittingNote}
         />
       )}
+
+      {stepModalOpen && (
+        <AddStepModal
+          repairId={repairId}
+          nextPosition={steps.length + 1}
+          onClose={() => setStepModalOpen(false)}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ['repair', repairId] })
+            setStepModalOpen(false)
+          }}
+        />
+      )}
+
+      {partModalOpen && (
+        <AddPartModal
+          repairId={repairId}
+          onClose={() => setPartModalOpen(false)}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ['repair', repairId] })
+            setPartModalOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-// ── Sub-components ────────────────────────────────────────────────────────────
+// ── Add Step Modal ────────────────────────────────────────────────────────────
+
+function AddStepModal({
+  repairId,
+  nextPosition,
+  onClose,
+  onSaved,
+}: {
+  repairId: string
+  nextPosition: number
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const api = useApi()
+  const [title,      setTitle]      = useState('')
+  const [notes,      setNotes]      = useState('')
+  const [torqueSpec, setTorqueSpec] = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [err,        setErr]        = useState('')
+
+  async function submit() {
+    if (!title.trim()) { setErr('A title is required.'); return }
+    setSaving(true)
+    setErr('')
+    try {
+      await api.repairs.createStep(repairId, {
+        position:    nextPosition,
+        title:       title.trim(),
+        notes:       notes.trim() || undefined,
+        torque_spec: torqueSpec.trim() || undefined,
+      })
+      await onSaved()
+    } catch (e: any) {
+      setErr(e.message ?? 'Something went wrong.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <DarkModal title="Add step" onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">
+            Title <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={title}
+            onChange={e => setTitle(e.target.value)}
+            placeholder="e.g. Remove drain plug"
+            autoFocus
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Notes</label>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            placeholder="Optional tips or details for this step…"
+            rows={2}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Torque spec</label>
+          <input
+            type="text"
+            value={torqueSpec}
+            onChange={e => setTorqueSpec(e.target.value)}
+            placeholder="e.g. 26 ft-lb"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {err && <p className="text-xs text-red-400">{err}</p>}
+        <ModalActions onClose={onClose} onSubmit={submit} saving={saving} label="Add step" />
+      </div>
+    </DarkModal>
+  )
+}
+
+// ── Add Part Modal ────────────────────────────────────────────────────────────
+
+function AddPartModal({
+  repairId,
+  onClose,
+  onSaved,
+}: {
+  repairId: string
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const api = useApi()
+  const [name,       setName]       = useState('')
+  const [partNumber, setPartNumber] = useState('')
+  const [supplier,   setSupplier]   = useState('')
+  const [cost,       setCost]       = useState('')
+  const [saving,     setSaving]     = useState(false)
+  const [err,        setErr]        = useState('')
+
+  async function submit() {
+    if (!name.trim()) { setErr('A name is required.'); return }
+    if (cost && isNaN(parseFloat(cost))) { setErr('Cost must be a number.'); return }
+    setSaving(true)
+    setErr('')
+    try {
+      await api.repairs.createPart(repairId, {
+        name:        name.trim(),
+        part_number: partNumber.trim() || undefined,
+        supplier:    supplier.trim() || undefined,
+        cost:        cost.trim() || undefined,
+      })
+      await onSaved()
+    } catch (e: any) {
+      setErr(e.message ?? 'Something went wrong.')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <DarkModal title="Add part" onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">
+            Name <span className="text-red-400">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="e.g. Brake pad set"
+            autoFocus
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Part number</label>
+            <input
+              type="text"
+              value={partNumber}
+              onChange={e => setPartNumber(e.target.value)}
+              placeholder="D1060-8J090"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Supplier</label>
+            <input
+              type="text"
+              value={supplier}
+              onChange={e => setSupplier(e.target.value)}
+              placeholder="RockAuto"
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Cost ($)</label>
+          <input
+            type="text"
+            value={cost}
+            onChange={e => setCost(e.target.value)}
+            placeholder="34.99"
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        {err && <p className="text-xs text-red-400">{err}</p>}
+        <ModalActions onClose={onClose} onSubmit={submit} saving={saving} label="Add part" />
+      </div>
+    </DarkModal>
+  )
+}
+
+// ── Shared modal primitives ───────────────────────────────────────────────────
+
+function DarkModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl mx-0 sm:mx-4 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-base font-semibold text-zinc-100">{title}</h2>
+          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  )
+}
+
+function ModalActions({
+  onClose, onSubmit, saving, label,
+}: { onClose: () => void; onSubmit: () => void; saving: boolean; label: string }) {
+  return (
+    <div className="flex gap-2 pt-1">
+      <button
+        onClick={onClose}
+        className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={onSubmit}
+        disabled={saving}
+        className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors"
+      >
+        {saving ? 'Saving…' : label}
+      </button>
+    </div>
+  )
+}
+
+function ConfirmDeleteModal({
+  onClose, onConfirm, confirming,
+}: { onClose: () => void; onConfirm: () => void; confirming: boolean }) {
+  return (
+    <DarkModal title="Delete repair?" onClose={onClose}>
+      <p className="text-sm text-zinc-500 mb-6">
+        This repair will be recoverable for 30 days. This action cannot be undone from the app.
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={onClose}
+          className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={confirming}
+          className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-medium text-sm py-2.5 rounded-xl transition-colors"
+        >
+          {confirming ? 'Deleting…' : 'Delete repair'}
+        </button>
+      </div>
+    </DarkModal>
+  )
+}
 
 function Section({
   title, count, accent, action, children,
@@ -507,44 +779,19 @@ function NoteModal({
   useEffect(() => { textareaRef.current?.focus() }, [])
 
   return (
-    <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl mx-0 sm:mx-4 p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-zinc-100">Add note</h2>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        <textarea
-          ref={textareaRef}
-          value={body}
-          onChange={e => onChange(e.target.value)}
-          placeholder="What did you notice? Any observations, issues, or measurements…"
-          rows={5}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-3 text-sm text-zinc-100 placeholder-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onSubmit() }}
-        />
-        <p className="text-xs text-zinc-600 mt-2 mb-4">⌘ + Enter to save</p>
-        <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onSubmit}
-            disabled={!body.trim() || submitting}
-            className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors"
-          >
-            {submitting ? 'Saving…' : 'Save note'}
-          </button>
-        </div>
-      </div>
-    </div>
+    <DarkModal title="Add note" onClose={onClose}>
+      <textarea
+        ref={textareaRef}
+        value={body}
+        onChange={e => onChange(e.target.value)}
+        placeholder="What did you notice? Any observations, issues, or measurements…"
+        rows={5}
+        className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-3 text-sm text-zinc-100 placeholder-zinc-600 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onSubmit() }}
+      />
+      <p className="text-xs text-zinc-600 mt-2 mb-4">⌘ + Enter to save</p>
+      <ModalActions onClose={onClose} onSubmit={onSubmit} saving={submitting} label="Save note" />
+    </DarkModal>
   )
 }
 

@@ -58,6 +58,13 @@ export function useApi() {
       },
       history: (id: string) =>
         fetchApi<RepairHistory[]>(`/v1/vehicles/${id}/history`),
+      create: (body: {
+        year: number; make: string; model: string; trim?: string; mileage?: number
+      }) =>
+        fetchApi<Vehicle>('/v1/vehicles', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
     },
 
     repairs: {
@@ -66,6 +73,12 @@ export function useApi() {
 
       getNotes: (repairId: string) =>
         fetchApi<NoteWithAuthor[]>(`/v1/repairs/${repairId}/notes`),
+
+      create: (body: { vehicle_id: string; title: string; system: string }) =>
+        fetchApi<Repair>('/v1/repairs', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
 
       updateStatus: (repairId: string, status: string) =>
         fetchApi<Repair>(`/v1/repairs/${repairId}`, {
@@ -78,6 +91,23 @@ export function useApi() {
           `/v1/repairs/${repairId}/steps/${stepId}/complete`,
           { method: 'POST' }
         ),
+
+      createStep: (repairId: string, body: { position: number; title: string; notes?: string; torque_spec?: string }) =>
+        fetchApi<RepairStep>(`/v1/repairs/${repairId}/steps`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
+
+      deleteStep: (repairId: string, stepId: string) =>
+        fetchApi<{ deleted: boolean; id: string }>(`/v1/repairs/${repairId}/steps/${stepId}`, {
+          method: 'DELETE',
+        }),
+
+      createPart: (repairId: string, body: { name: string; part_number?: string; supplier?: string; cost?: string; notes?: string }) =>
+        fetchApi<Part>(`/v1/repairs/${repairId}/parts`, {
+          method: 'POST',
+          body: JSON.stringify(body),
+        }),
 
       updatePartStatus: (repairId: string, partId: string, status: string) =>
         fetchApi<Part>(`/v1/repairs/${repairId}/parts/${partId}/status`, {
@@ -92,7 +122,7 @@ export function useApi() {
         }),
 
       deleteRepair: (repairId: string) =>
-        fetchApi<{ deleted: Boolean; id: string }>(`/v1/repairs/${repairId}`, {
+        fetchApi<{ deleted: boolean; id: string }>(`/v1/repairs/${repairId}`, {
           method: 'DELETE',
         }),
 

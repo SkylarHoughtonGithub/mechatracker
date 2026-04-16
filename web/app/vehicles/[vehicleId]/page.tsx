@@ -1,104 +1,167 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useGarage } from '@/lib/queries'
 
-const SYSTEM_ICONS: Record<string, string> = {
-  engine:       '⚙️',
-  suspension:   '🔩',
-  brakes:       '🛑',
-  electrical:   '⚡',
-  transmission: '🔧',
-  cooling:      '🌡️',
-  fuel:         '⛽',
-  exhaust:      '💨',
-  steering:     '🎯',
-  tires:        '🔄',
-  hvac:         '❄️',
-  body:         '🚗',
-}
+const ALL_SYSTEMS: { id: string; label: string; icon: string }[] = [
+  { id: 'engine',       label: 'Engine',         icon: '⚙️'  },
+  { id: 'transmission', label: 'Transmission',    icon: '🔧'  },
+  { id: 'brakes',       label: 'Brakes',          icon: '🛑'  },
+  { id: 'suspension',   label: 'Suspension',      icon: '🔩'  },
+  { id: 'steering',     label: 'Steering',        icon: '🎯'  },
+  { id: 'electrical',   label: 'Electrical',      icon: '⚡'  },
+  { id: 'cooling',      label: 'Cooling',         icon: '🌡️' },
+  { id: 'fuel',         label: 'Fuel System',     icon: '⛽'  },
+  { id: 'exhaust',      label: 'Exhaust',         icon: '💨'  },
+  { id: 'hvac',         label: 'HVAC',            icon: '❄️'  },
+  { id: 'tires',        label: 'Tires & Wheels',  icon: '🔄'  },
+  { id: 'body',         label: 'Body & Interior', icon: '🚗'  },
+]
 
 export default function VehiclePage() {
   const params = useParams()
   const vehicleId = params.vehicleId as string
+  const router = useRouter()
 
   const { data: garage, isLoading, error } = useGarage()
+  const [customModalOpen, setCustomModalOpen] = useState(false)
+  const [customSystem, setCustomSystem] = useState('')
 
-  if (isLoading) return <div className="p-8 text-sm text-gray-500">Loading...</div>
+  if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
   if (error) return <div className="p-8 text-sm text-red-500">Error: {(error as Error).message}</div>
 
   const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
-  if (!vehicle) return <div className="p-8 text-sm text-gray-400">Vehicle not found.</div>
+  if (!vehicle) return <div className="p-8 text-sm text-zinc-500">Vehicle not found.</div>
 
   const label = `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` · ${vehicle.trim}` : ''}`
 
-  return (
-    <main className="p-8 max-w-2xl">
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-6">
-        <Link href="/" className="hover:text-gray-700">Garage</Link>
-        <span></span>
-        <span className="text-gray-700">{label}</span>
-      </nav>
+  const systemStats: Record<string, { repair_count: number; has_open: boolean }> = {}
+  for (const s of vehicle.systems ?? []) {
+    if (s.id) systemStats[s.id] = { repair_count: s.repair_count ?? 0, has_open: s.has_open ?? false }
+  }
 
-      <div className="rounded-lg border p-4 mb-6">
-        <div className="font-semibold text-lg">{label}</div>
-        {vehicle.mileage != null && (
-          <div className="text-sm text-gray-400 mt-0.5">{vehicle.mileage.toLocaleString()} mi</div>
-        )}
-        {(vehicle.open_repairs ?? 0) > 0 && (
-          <div className="mt-3">
-            <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">
-              {vehicle.open_repairs} open repair{vehicle.open_repairs !== 1 ? 's' : ''}
-            </span>
+  const knownIds = new Set(ALL_SYSTEMS.map(s => s.id))
+  const customSystems = (vehicle.systems ?? [])
+    .filter(s => s.id && !knownIds.has(s.id))
+    .map(s => ({ id: s.id!, label: s.label ?? s.id!, icon: '🔨' }))
+
+  const allDisplayed = [...ALL_SYSTEMS, ...customSystems]
+
+  function goToCustomSystem() {
+    const id = customSystem.trim().toLowerCase().replace(/\s+/g, '_')
+    if (!id) return
+    setCustomModalOpen(false)
+    setCustomSystem('')
+    router.push(`/vehicles/${vehicleId}/${id}`)
+  }
+
+  return (
+    <div className="p-8">
+      <div className="max-w-2xl mx-auto">
+        <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-6">
+          <Link href="/" className="hover:text-zinc-300 transition-colors">Garage</Link>
+          <svg className="w-3 h-3 text-zinc-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+          </svg>
+          <span className="text-zinc-200">{label}</span>
+        </nav>
+
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4 mb-6">
+          <div className="font-semibold text-lg text-zinc-100">{label}</div>
+          {vehicle.mileage != null && (
+            <div className="text-sm text-zinc-500 mt-0.5">{vehicle.mileage.toLocaleString()} mi</div>
+          )}
+          {(vehicle.open_repairs ?? 0) > 0 && (
+            <div className="mt-3">
+              <span className="bg-blue-950 text-blue-400 text-xs px-2 py-0.5 rounded-full font-medium">
+                {vehicle.open_repairs} open repair{vehicle.open_repairs !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Systems</h2>
+          <div className="flex items-center gap-3">
+            <Link href={`/vehicles/${vehicleId}/history`} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+              View history →
+            </Link>
+            <button onClick={() => setCustomModalOpen(true)} className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
+              + Custom system
+            </button>
           </div>
-        )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          {allDisplayed.map(system => {
+            const stats = systemStats[system.id]
+            const hasRepairs = (stats?.repair_count ?? 0) > 0
+            return (
+              <Link
+                key={system.id}
+                href={`/vehicles/${vehicleId}/${system.id}`}
+                className="flex items-center gap-3 bg-zinc-900 rounded-xl border border-zinc-800 p-4 hover:border-zinc-700 hover:bg-zinc-800/50 transition-colors"
+              >
+                <div className="text-xl w-7 text-center flex-shrink-0">{system.icon}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm text-zinc-100">{system.label}</div>
+                  <div className="text-xs mt-0.5">
+                    {hasRepairs
+                      ? <span className="text-zinc-500">{stats.repair_count} repair{stats.repair_count !== 1 ? 's' : ''}</span>
+                      : <span className="text-zinc-700">No repairs yet</span>
+                    }
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {stats?.has_open && (
+                    <span className="text-xs bg-blue-950 text-blue-400 px-2 py-0.5 rounded-full font-medium">open</span>
+                  )}
+                  <svg className="w-4 h-4 text-zinc-700" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                  </svg>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
       </div>
 
-      <h2 className="text-sm font-medium text-gray-500 mb-3">Systems</h2>
-
-      <Link
-        href={`/vehicles/${vehicleId}/history`}
-        className="inline-flex items-center gap-1 text-xs text-zinc-400 hover:text-zinc-200 transition-colors mb-3"
-      >
-        View repair history →
-      </Link>
-
-      {(!vehicle.systems || vehicle.systems.length === 0) ? (
-        <div className="rounded-lg border border-dashed p-8 text-center text-sm text-gray-400">
-          No repairs logged yet for this vehicle.
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {vehicle.systems.map(system => (
-            <Link
-              key={system.id}
-              href={`/vehicles/${vehicleId}/${system.id}`}
-              className="flex items-center gap-3 rounded-lg border p-4 hover:border-gray-300 hover:bg-gray-50 transition-colors"
-            >
-              <div className="text-2xl w-8 text-center flex-shrink-0">
-                {SYSTEM_ICONS[system.id ?? ''] ?? '🔧'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm">{system.label}</div>
-                <div className="text-xs text-gray-400 mt-0.5">
-                  {system.repair_count} repair{system.repair_count !== 1 ? 's' : ''}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 text-xs flex-shrink-0">
-                {system.has_open && (
-                  <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                    open
-                  </span>
-                )}
-                <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+      {customModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setCustomModalOpen(false)} />
+          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: '#18181b', borderTop: '1px solid #27272a', borderRadius: '16px 16px 0 0', padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-base font-semibold text-zinc-100">Add custom system</span>
+              <button onClick={() => setCustomModalOpen(false)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </div>
-            </Link>
-          ))}
+              </button>
+            </div>
+            <label className="block text-xs text-zinc-500 mb-1.5">System name</label>
+            <input
+              type="text"
+              value={customSystem}
+              onChange={e => setCustomSystem(e.target.value)}
+              placeholder="e.g. Winch, Lift kit, Roof rack…"
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') goToCustomSystem() }}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-xs text-zinc-600 mt-2 mb-5">You'll land on the repair list for this system.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setCustomModalOpen(false)} className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors">
+                Cancel
+              </button>
+              <button onClick={goToCustomSystem} disabled={!customSystem.trim()} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
+                Go to system
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </main>
+    </div>
   )
 }
