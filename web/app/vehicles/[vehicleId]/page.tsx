@@ -89,7 +89,7 @@ export default function VehiclePage() {
               View history →
             </Link>
             <button onClick={() => setCustomModalOpen(true)} className="text-xs text-blue-400 hover:text-blue-300 font-medium transition-colors">
-              + Custom system
+              + Add system
             </button>
           </div>
         </div>
@@ -128,40 +128,40 @@ export default function VehiclePage() {
         </div>
       </div>
 
-      {customModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={() => setCustomModalOpen(false)} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: '#18181b', borderTop: '1px solid #27272a', borderRadius: '16px 16px 0 0', padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-base font-semibold text-zinc-100">Add custom system</span>
-              <button onClick={() => setCustomModalOpen(false)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <label className="block text-xs text-zinc-500 mb-1.5">System name</label>
-            <input
-              type="text"
-              value={customSystem}
-              onChange={e => setCustomSystem(e.target.value)}
-              placeholder="e.g. Winch, Lift kit, Roof rack…"
-              autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') goToCustomSystem() }}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <p className="text-xs text-zinc-600 mt-2 mb-5">You'll land on the repair list for this system.</p>
-            <div className="flex gap-2">
-              <button onClick={() => setCustomModalOpen(false)} className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors">
-                Cancel
-              </button>
-              <button onClick={goToCustomSystem} disabled={!customSystem.trim()} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
-                Go to system
-              </button>
-            </div>
+    {customModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setCustomModalOpen(false)} />
+        <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-base font-semibold text-zinc-100">Add system</span>
+            <button onClick={() => setCustomModalOpen(false)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <label className="block text-xs text-zinc-500 mb-1.5">System name</label>
+          <input
+            type="text"
+            value={customSystem}
+            onChange={e => setCustomSystem(e.target.value)}
+            placeholder="e.g. Winch, Lift kit, Roof rack…"
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') goToCustomSystem() }}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <p className="text-xs text-zinc-600 mt-2 mb-5">You'll land on the repair list for this system.</p>
+          <div className="flex gap-2">
+            <button onClick={() => setCustomModalOpen(false)} className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors">
+              Cancel
+            </button>
+            <button onClick={goToCustomSystem} disabled={!customSystem.trim()} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
+              Go to system
+            </button>
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   )
 }

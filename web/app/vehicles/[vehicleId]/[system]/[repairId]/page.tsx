@@ -672,9 +672,9 @@ function AddPartModal({
 
 function DarkModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 z-30 flex items-end sm:items-center justify-center">
+    <div className="fixed inset-0 z-30 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-t-2xl sm:rounded-2xl shadow-2xl mx-0 sm:mx-4 p-5">
+      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-zinc-100">{title}</h2>
           <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">

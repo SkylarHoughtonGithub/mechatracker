@@ -95,9 +95,9 @@ function AddRepairModal({ vehicleId, system, systemLabel, onClose }: { vehicleId
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50 }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: '#18181b', borderTop: '1px solid #27272a', borderRadius: '16px 16px 0 0', padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <span className="text-base font-semibold text-zinc-100">Add repair</span>
           <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">

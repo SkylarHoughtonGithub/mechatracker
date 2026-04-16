@@ -104,7 +104,7 @@ function AddVehicleModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <DarkBottomModal onClose={onClose}>
+    <DarkModal onClose={onClose}>
       <div className="flex items-center justify-between mb-4">
         <span className="text-base font-semibold text-zinc-100">Add vehicle</span>
         <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
@@ -145,15 +145,15 @@ function AddVehicleModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </DarkBottomModal>
+    </DarkModal>
   )
 }
 
-function DarkBottomModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function DarkModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }} onClick={onClose} />
-      <div style={{ position: 'relative', background: '#18181b', borderTop: '1px solid #27272a', borderRadius: '16px 16px 0 0', padding: '20px', maxHeight: '80vh', overflowY: 'auto' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
         {children}
       </div>
     </div>
