@@ -159,3 +159,13 @@ DELETE FROM deleted_items WHERE purge_at < now();
 SELECT * FROM resources
 WHERE repair_id = $1
 ORDER BY saved_at ASC;
+
+-- name: CreateOrg :one
+-- Called from the cClerk webhook handler when a new user signs up.
+-- a personal org is created first, then CreateUser is called in the same tx.
+INSERT INTO organizations (name, slug, plan, personal)
+VALUES ($1, $2, 'personal', true)
+RETURNING *;
+
+-- name: GetOrgBySlug :one
+SELECT * FROM organizations WHERE slug = $1 LIMIT 1;

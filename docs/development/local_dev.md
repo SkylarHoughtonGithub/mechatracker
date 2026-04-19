@@ -137,3 +137,84 @@ Full Clerk JWT verification (`rsaPEMFromJWK` in `middleware/auth.go`) is not yet
 `sqlc.yaml` lives in `api/` and is configured to read schema from `migrations/001_init.up` and queries from `queries/`. Output goes to `internal/store/`.
 
 `.mockery.yaml` lives in `api/` and generates `MockQuerier` into `internal/mocks/mock_Querier.go` from the `store.Querier` interface. Use `MockQuerier` in handler unit tests to avoid needing a real database connection.
+
+---
+
+## Webhook tunneling (Clerk user.created)
+
+The Clerk webhook fires on real user signups and provisions the org + user row in your database. For this to work locally, Clerk needs a public HTTPS URL that routes to your local API.
+
+All services run as ClusterIP inside k8s, so nothing is exposed outside the cluster by default. The full chain is:
+
+```
+Clerk → ngrok → kubectl port-forward → mechatracker-api pod
+```
+
+### One-time setup
+
+**1. Install ngrok**
+```sh
+brew install ngrok
+```
+
+**2. Authenticate**
+
+Sign up at [ngrok.com](https://ngrok.com), then:
+```sh
+ngrok config add-authtoken <your-token>
+```
+
+**3. Set the webhook URL in Clerk — once**
+
+Clerk Dashboard → Webhooks → Add Endpoint:
+```
+https://<your-ngrok-subdomain>.ngrok-free.app/webhooks/clerk
+```
+Subscribe to: `user.created`
+
+Copy the **Signing Secret** (`whsec_...`) into:
+- `api/.env` → `CLERK_WEBHOOK_SECRET=whsec_...`
+- `infra/helm/mechatracker/values.dev.local.yaml` → `CLERK_WEBHOOK_SECRET: "whsec_..."`
+
+The ngrok free tier generates a new subdomain each session, so you'll need to update the Clerk URL each time unless you upgrade to a paid plan with a reserved domain.
+
+---
+
+### Daily dev workflow
+
+Port assignments:
+- `localhost:8080` — API (matches `NEXT_PUBLIC_API_URL`, ngrok tunnels here)
+- `localhost:3000` — Web (browse here)
+
+When testing signup flows, use the tunnel task which starts everything together:
+
+```sh
+task dev:tunnels
+```
+
+This runs in parallel:
+- `kubectl port-forward svc/mechatracker-api 8080:8080`
+- `kubectl port-forward svc/mechatracker-web 3000:3000`
+- `ngrok http 8080`
+
+Browse to `http://localhost:3000`. After ngrok starts, copy the forwarding URL from its output and update the Clerk webhook endpoint URL.
+
+The tunnel only needs to be running when testing real signups. For normal development with your existing seeded account, you don't need ngrok — just the port-forwards.
+
+---
+
+### Testing the webhook
+
+Most realistic test: run `task dev:tunnels`, update the Clerk webhook URL with the new ngrok URL, then create a brand new account through the sign-up flow.
+
+To test provisioning logic without a real signup, use the Clerk dashboard → Webhooks → **Send Test Event** → `user.created` while the tunnel is running.
+
+---
+
+### Troubleshooting
+
+**404 from ngrok** — Check the Clerk webhook URL has the correct domain (`.ngrok-free.app` not `.ngrok-free.dev`) and includes the full path `/webhooks/clerk`.
+
+**CORS errors in browser** — The web port-forward is conflicting with the API on 8080. Make sure web is forwarded to 3000 and API to 8080, and browse to `localhost:3000`.
+
+**401 on /v1/garage after signup** — The webhook didn't fire or failed. Check ngrok output for the POST to `/webhooks/clerk` and look at API logs with `kubectl logs -n mechatracker-dev deploy/api`.

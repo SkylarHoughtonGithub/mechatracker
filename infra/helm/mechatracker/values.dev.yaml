@@ -15,6 +15,7 @@ api:
     CLERK_DEV_BYPASS: "false"
     CLERK_JWKS_URL: "https://daring-drake-86.clerk.accounts.dev/.well-known/jwks.json"
     CLERK_AUDIENCE: ""
+    CLERK_WEBHOOK_SECRET: ""
     SPACES_ENDPOINT: ""
     SPACES_BUCKET: ""
     SPACES_ACCESS_KEY: ""

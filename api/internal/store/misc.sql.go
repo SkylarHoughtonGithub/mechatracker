@@ -90,6 +90,33 @@ func (q *Queries) CreateNote(ctx context.Context, arg CreateNoteParams) (RepairN
 	return i, err
 }
 
+const createOrg = `-- name: CreateOrg :one
+INSERT INTO organizations (name, slug, plan, personal)
+VALUES ($1, $2, 'personal', true)
+RETURNING id, name, slug, plan, personal, created_at
+`
+
+type CreateOrgParams struct {
+	Name string `json:"name"`
+	Slug string `json:"slug"`
+}
+
+// Called from the cClerk webhook handler when a new user signs up.
+// a personal org is created first, then CreateUser is called in the same tx.
+func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (Organization, error) {
+	row := q.db.QueryRow(ctx, createOrg, arg.Name, arg.Slug)
+	var i Organization
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Plan,
+		&i.Personal,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createPart = `-- name: CreatePart :one
 INSERT INTO parts (repair_id, name, part_number, supplier, status, cost, notes)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -247,6 +274,24 @@ type DeleteStepParams struct {
 func (q *Queries) DeleteStep(ctx context.Context, arg DeleteStepParams) error {
 	_, err := q.db.Exec(ctx, deleteStep, arg.ID, arg.RepairID)
 	return err
+}
+
+const getOrgBySlug = `-- name: GetOrgBySlug :one
+SELECT id, name, slug, plan, personal, created_at FROM organizations WHERE slug = $1 LIMIT 1
+`
+
+func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (Organization, error) {
+	row := q.db.QueryRow(ctx, getOrgBySlug, slug)
+	var i Organization
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Plan,
+		&i.Personal,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getUserByClerkID = `-- name: GetUserByClerkID :one
