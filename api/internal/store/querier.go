@@ -16,6 +16,9 @@ type Querier interface {
 	// Used to recalculate progress_pct after a complete/uncomplete.
 	CountSteps(ctx context.Context, repairID uuid.UUID) (CountStepsRow, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (RepairNote, error)
+	// Called from the cClerk webhook handler when a new user signs up.
+	// a personal org is created first, then CreateUser is called in the same tx.
+	CreateOrg(ctx context.Context, arg CreateOrgParams) (Organization, error)
 	CreatePart(ctx context.Context, arg CreatePartParams) (Part, error)
 	CreateRepair(ctx context.Context, arg CreateRepairParams) (Repair, error)
 	CreateStep(ctx context.Context, arg CreateStepParams) (RepairStep, error)
@@ -36,6 +39,7 @@ type Querier interface {
 	// The handler collapses these into nested vehicle → []systems structs.
 	// Vehicles with no repairs appear once with NULL system columns.
 	GetGarageVehicles(ctx context.Context, orgID uuid.UUID) ([]GetGarageVehiclesRow, error)
+	GetOrgBySlug(ctx context.Context, slug string) (Organization, error)
 	// ============================================================
 	// mechatracker — Repair Queries
 	// ============================================================

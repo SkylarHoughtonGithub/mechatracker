@@ -54,7 +54,9 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	gh := handler.NewGarageHandler(q, log)
 	rh := handler.NewRepairHandler(q, log)
 	ph := handler.NewPartsHandler(q, log)
+	wh := handler.NewClerkWebhookHandler(q, log, cfg.ClerkWebhookSecret)
 
+	r.POST("/webhooks/clerk", wh.HandleClerkWebhook)
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
 	v1.Use(middleware.UserLookup(q, log))

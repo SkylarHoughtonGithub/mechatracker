@@ -17,9 +17,10 @@ type Config struct {
 
 	// ClerkDevBypass skips JWT verification and injects a synthetic user.
 	// Only allowed when Env == "development". Never set in staging/prod.
-	ClerkDevBypass bool
-	ClerkJWKSURL   string
-	ClerkAudience  string
+	ClerkDevBypass     bool
+	ClerkJWKSURL       string
+	ClerkAudience      string
+	ClerkWebhookSecret string
 
 	SpacesEndpoint  string
 	SpacesBucket    string
@@ -33,17 +34,18 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:            envInt("PORT", 8080),
-		Env:             envStr("ENV", "development"),
-		DatabaseURL:     envStr("DATABASE_URL", ""),
-		ClerkDevBypass:  envBool("CLERK_DEV_BYPASS", false),
-		ClerkJWKSURL:    envStr("CLERK_JWKS_URL", ""),
-		ClerkAudience:   envStr("CLERK_AUDIENCE", ""),
-		SpacesEndpoint:  envStr("SPACES_ENDPOINT", ""),
-		SpacesBucket:    envStr("SPACES_BUCKET", ""),
-		SpacesAccessKey: envStr("SPACES_ACCESS_KEY", ""),
-		SpacesSecretKey: envStr("SPACES_SECRET_KEY", ""),
-		SentryDSN:       envStr("SENTRY_DSN", ""),
+		Port:               envInt("PORT", 8080),
+		Env:                envStr("ENV", "development"),
+		DatabaseURL:        envStr("DATABASE_URL", ""),
+		ClerkDevBypass:     envBool("CLERK_DEV_BYPASS", false),
+		ClerkJWKSURL:       envStr("CLERK_JWKS_URL", ""),
+		ClerkAudience:      envStr("CLERK_AUDIENCE", ""),
+		ClerkWebhookSecret: envStr("CLERK_WEBHOOK_SECRET", ""),
+		SpacesEndpoint:     envStr("SPACES_ENDPOINT", ""),
+		SpacesBucket:       envStr("SPACES_BUCKET", ""),
+		SpacesAccessKey:    envStr("SPACES_ACCESS_KEY", ""),
+		SpacesSecretKey:    envStr("SPACES_SECRET_KEY", ""),
+		SentryDSN:          envStr("SENTRY_DSN", ""),
 	}
 
 	return cfg, cfg.validate()

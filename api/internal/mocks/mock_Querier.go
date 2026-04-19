@@ -197,6 +197,63 @@ func (_c *MockQuerier_CreateNote_Call) RunAndReturn(run func(context.Context, st
 	return _c
 }
 
+// CreateOrg provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) CreateOrg(ctx context.Context, arg store.CreateOrgParams) (store.Organization, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateOrg")
+	}
+
+	var r0 store.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, store.CreateOrgParams) (store.Organization, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, store.CreateOrgParams) store.Organization); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Get(0).(store.Organization)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, store.CreateOrgParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_CreateOrg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateOrg'
+type MockQuerier_CreateOrg_Call struct {
+	*mock.Call
+}
+
+// CreateOrg is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg store.CreateOrgParams
+func (_e *MockQuerier_Expecter) CreateOrg(ctx interface{}, arg interface{}) *MockQuerier_CreateOrg_Call {
+	return &MockQuerier_CreateOrg_Call{Call: _e.mock.On("CreateOrg", ctx, arg)}
+}
+
+func (_c *MockQuerier_CreateOrg_Call) Run(run func(ctx context.Context, arg store.CreateOrgParams)) *MockQuerier_CreateOrg_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(store.CreateOrgParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_CreateOrg_Call) Return(_a0 store.Organization, _a1 error) *MockQuerier_CreateOrg_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_CreateOrg_Call) RunAndReturn(run func(context.Context, store.CreateOrgParams) (store.Organization, error)) *MockQuerier_CreateOrg_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CreatePart provides a mock function with given fields: ctx, arg
 func (_m *MockQuerier) CreatePart(ctx context.Context, arg store.CreatePartParams) (store.Part, error) {
 	ret := _m.Called(ctx, arg)
@@ -839,6 +896,63 @@ func (_c *MockQuerier_GetGarageVehicles_Call) Return(_a0 []store.GetGarageVehicl
 }
 
 func (_c *MockQuerier_GetGarageVehicles_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]store.GetGarageVehiclesRow, error)) *MockQuerier_GetGarageVehicles_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetOrgBySlug provides a mock function with given fields: ctx, slug
+func (_m *MockQuerier) GetOrgBySlug(ctx context.Context, slug string) (store.Organization, error) {
+	ret := _m.Called(ctx, slug)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetOrgBySlug")
+	}
+
+	var r0 store.Organization
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (store.Organization, error)); ok {
+		return rf(ctx, slug)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) store.Organization); ok {
+		r0 = rf(ctx, slug)
+	} else {
+		r0 = ret.Get(0).(store.Organization)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, slug)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetOrgBySlug_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetOrgBySlug'
+type MockQuerier_GetOrgBySlug_Call struct {
+	*mock.Call
+}
+
+// GetOrgBySlug is a helper method to define mock.On call
+//   - ctx context.Context
+//   - slug string
+func (_e *MockQuerier_Expecter) GetOrgBySlug(ctx interface{}, slug interface{}) *MockQuerier_GetOrgBySlug_Call {
+	return &MockQuerier_GetOrgBySlug_Call{Call: _e.mock.On("GetOrgBySlug", ctx, slug)}
+}
+
+func (_c *MockQuerier_GetOrgBySlug_Call) Run(run func(ctx context.Context, slug string)) *MockQuerier_GetOrgBySlug_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetOrgBySlug_Call) Return(_a0 store.Organization, _a1 error) *MockQuerier_GetOrgBySlug_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetOrgBySlug_Call) RunAndReturn(run func(context.Context, string) (store.Organization, error)) *MockQuerier_GetOrgBySlug_Call {
 	_c.Call.Return(run)
 	return _c
 }
