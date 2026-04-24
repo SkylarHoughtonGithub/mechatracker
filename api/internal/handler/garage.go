@@ -55,6 +55,7 @@ type garageStats struct {
 
 // garageResponse is the full response body for GET /v1/garage.
 type garageResponse struct {
+	OrgName  string          `json:"org_name"`
 	Vehicles []garageVehicle `json:"vehicles"`
 	Stats    garageStats     `json:"stats"`
 }
@@ -78,6 +79,7 @@ func (h *GarageHandler) GetGarage(c *gin.Context) {
 	var (
 		vehicleRows []store.GetGarageVehiclesRow
 		statsRow    store.GetGarageStatsRow
+		org         store.Organization
 	)
 
 	g, ctx := errgroup.WithContext(c.Request.Context())
@@ -94,6 +96,12 @@ func (h *GarageHandler) GetGarage(c *gin.Context) {
 		return err
 	})
 
+	g.Go(func() error {
+		var err error
+		org, err = h.q.GetOrgByID(ctx, orgID)
+		return err
+	})
+
 	if err := g.Wait(); err != nil {
 		h.log.Error("GetGarage", zap.Error(err), zap.String("org_id", orgID.String()))
 		apierr.Internal(c)
@@ -101,6 +109,7 @@ func (h *GarageHandler) GetGarage(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, garageResponse{
+		OrgName:  org.Name,
 		Vehicles: collapseVehicleRows(vehicleRows),
 		Stats:    mapGarageStats(statsRow),
 	})

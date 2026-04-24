@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
-import { useRepair, useVehicleSystemLabel, useNotes } from '@/lib/queries'
+import { useRepair, useVehicleSystemLabel, useNotes, useGarage } from '@/lib/queries'
 import { useApi, type RepairStep, type Part, type NoteWithAuthor } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -51,6 +51,7 @@ export default function RepairCardPage() {
   const { data: repair, isLoading, error } = useRepair(repairId)
   const { data: notes, isLoading: notesLoading } = useNotes(repairId)
   const systemLabel = useVehicleSystemLabel(vehicleId, system)
+  const { data: garage } = useGarage()
 
   const api = useApi()
   const qc  = useQueryClient()
@@ -66,6 +67,15 @@ export default function RepairCardPage() {
   const [stepModalOpen,   setStepModalOpen]   = useState(false)
   const [partModalOpen,   setPartModalOpen]   = useState(false)
   const router = useRouter()
+
+  const vehicleLabel = (() => {
+    const v = garage?.vehicles?.find(v => v.id === vehicleId)
+    return v ? `${v.year} ${v.make} ${v.model}` : '...'
+  })()
+
+  useEffect(() => {
+    if (repair?.title) document.title = `${repair.title} · ${systemLabel}`
+  }, [repair?.title, systemLabel])
 
   if (isLoading) return <LoadingState />
   if (error)     return <ErrorState message={(error as Error).message} />
@@ -141,9 +151,9 @@ export default function RepairCardPage() {
       <header className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-3 flex-wrap">
-            <Link href="/" className="hover:text-zinc-300 transition-colors">Garage</Link>
+            <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
             <Chevron />
-            <Link href={`/vehicles/${vehicleId}`} className="hover:text-zinc-300 transition-colors">Vehicle</Link>
+            <Link href={`/vehicles/${vehicleId}`} className="hover:text-zinc-300 transition-colors">{vehicleLabel}</Link>
             <Chevron />
             <Link href={`/vehicles/${vehicleId}/${system}`} className="hover:text-zinc-300 transition-colors">{systemLabel}</Link>
             <Chevron />

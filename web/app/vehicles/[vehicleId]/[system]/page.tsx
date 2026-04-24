@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useGarage, useVehicleRepairs } from '@/lib/queries'
@@ -28,6 +28,14 @@ export default function SystemRepairsPage({ params }: { params: Promise<{ vehicl
   const [modalOpen, setModalOpen] = useState(false)
 
   const isLoading = garageLoading || repairsLoading
+
+  useEffect(() => {
+    const v = garage?.vehicles?.find(v => v.id === vehicleId)
+    const sLabel = v?.systems?.find(s => s.id === system)?.label ?? system
+    const vLabel = v ? `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''}` : null
+    if (vLabel) document.title = `${sLabel} · ${vLabel}`
+  }, [garage, vehicleId, system])
+
   if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
   if (error) return <div className="p-8 text-sm text-red-500">Error: {error.message}</div>
 
@@ -40,7 +48,7 @@ export default function SystemRepairsPage({ params }: { params: Promise<{ vehicl
     <div className="p-8">
       <div className="max-w-2xl mx-auto">
         <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-6 flex-wrap">
-          <Link href="/" className="hover:text-zinc-300 transition-colors">Garage</Link>
+          <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
           <Chevron />
           <Link href={`/vehicles/${vehicleId}`} className="hover:text-zinc-300 transition-colors">{vehicleLabel}</Link>
           <Chevron />

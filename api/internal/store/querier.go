@@ -39,6 +39,7 @@ type Querier interface {
 	// The handler collapses these into nested vehicle → []systems structs.
 	// Vehicles with no repairs appear once with NULL system columns.
 	GetGarageVehicles(ctx context.Context, orgID uuid.UUID) ([]GetGarageVehiclesRow, error)
+	GetOrgByID(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrgBySlug(ctx context.Context, slug string) (Organization, error)
 	// ============================================================
 	// mechatracker — Repair Queries
