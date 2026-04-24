@@ -441,6 +441,8 @@ definitions:
     type: object
   internal_handler.garageResponse:
     properties:
+      org_name:
+        type: string
       stats:
         $ref: '#/definitions/internal_handler.garageStats'
       vehicles:
@@ -1485,6 +1487,32 @@ paths:
       summary: List repairs for a vehicle
       tags:
       - vehicles
+  /webhooks/clerk:
+    post:
+      consumes:
+      - application/json
+      description: Receives and verifies Clerk webhook events. Handles user.created
+        to provision org + user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      summary: Clerk webhook receiver
+      tags:
+      - webhooks
 securityDefinitions:
   BearerAuth:
     description: Type "Bearer" followed by a space and the Clerk JWT.

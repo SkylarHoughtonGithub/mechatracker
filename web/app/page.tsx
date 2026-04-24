@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useGarage } from '@/lib/queries'
 import { useApi } from '@/lib/api'
@@ -11,6 +11,10 @@ export default function HomePage() {
   const { data, isLoading, error } = useGarage()
   const [modalOpen, setModalOpen] = useState(false)
 
+  useEffect(() => {
+    if (data?.org_name) document.title = data.org_name
+  }, [data?.org_name])
+
   if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading garage...</div>
   if (error) return <div className="p-8 text-sm text-red-500">Error: {error.message}</div>
 
@@ -18,7 +22,7 @@ export default function HomePage() {
     <div className="p-8">
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-semibold text-zinc-100">Garage</h1>
+          <h1 className="text-2xl font-semibold text-zinc-100">{data?.org_name ?? 'Garage'}</h1>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setModalOpen(true)}

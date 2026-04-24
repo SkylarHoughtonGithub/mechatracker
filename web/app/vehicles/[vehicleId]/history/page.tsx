@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useGarage, useVehicleHistory } from '@/lib/queries'
@@ -33,6 +33,14 @@ export default function VehicleHistoryPage() {
 
   const isLoading = garageLoading || historyLoading
 
+  useEffect(() => {
+    const v = garage?.vehicles?.find(v => v.id === vehicleId)
+    if (v && garage?.org_name) {
+      const lbl = `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''}`
+      document.title = `History · ${lbl} · ${garage.org_name}`
+    }
+  }, [garage, vehicleId])
+
   if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
   if (error) return <div className="p-8 text-sm text-red-500">Error: {(error as Error).message}</div>
 
@@ -56,7 +64,7 @@ export default function VehicleHistoryPage() {
       <div className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-3 flex-wrap">
-            <Link href="/" className="hover:text-zinc-300 transition-colors">Garage</Link>
+            <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
             <Chevron />
             <Link href={`/vehicles/${vehicleId}`} className="hover:text-zinc-300 transition-colors">{vehicleLabel}</Link>
             <Chevron />

@@ -169,3 +169,6 @@ RETURNING *;
 
 -- name: GetOrgBySlug :one
 SELECT * FROM organizations WHERE slug = $1 LIMIT 1;
+
+-- name: GetOrgByID :one
+SELECT * FROM organizations WHERE id = $1 LIMIT 1;

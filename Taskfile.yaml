@@ -93,6 +93,7 @@ tasks:
       - echo "✓  Web  http://web.localhost:8080"
       - echo "   Run 'task db:forward' then 'task db:migrate' to apply migrations"
       - echo "   Then seed dev user by running 'task db:seed:user'"
+      - task: dev:tunnels
   
   dev:hosts:
   desc: "Check /etc/hosts has required entries for local dev"

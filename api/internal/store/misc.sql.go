@@ -276,6 +276,24 @@ func (q *Queries) DeleteStep(ctx context.Context, arg DeleteStepParams) error {
 	return err
 }
 
+const getOrgByID = `-- name: GetOrgByID :one
+SELECT id, name, slug, plan, personal, created_at FROM organizations WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetOrgByID(ctx context.Context, id uuid.UUID) (Organization, error) {
+	row := q.db.QueryRow(ctx, getOrgByID, id)
+	var i Organization
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.Plan,
+		&i.Personal,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getOrgBySlug = `-- name: GetOrgBySlug :one
 SELECT id, name, slug, plan, personal, created_at FROM organizations WHERE slug = $1 LIMIT 1
 `
