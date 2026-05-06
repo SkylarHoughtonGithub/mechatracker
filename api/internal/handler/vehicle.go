@@ -252,6 +252,46 @@ func (h *VehicleHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"deleted": true, "id": vehicleID})
 }
 
+// DeleteSystem godoc
+// @Summary      Delete all repairs in a system for a vehicle
+// @Description  Deletes all repairs (and their steps, parts, notes) for the given vehicle+system.
+// @Tags         vehicles
+// @Produce      json
+// @Param        vehicleID  path      string  true  "Vehicle UUID"  format(uuid)
+// @Param        systemKey  path      string  true  "System key (e.g. winch)"
+// @Success      200        {object}  map[string]interface{}
+// @Failure      400        {object}  apierr.ErrorResponse
+// @Failure      401        {object}  apierr.ErrorResponse
+// @Security     BearerAuth
+// @Router       /vehicles/{vehicleID}/systems/{systemKey} [delete]
+func (h *VehicleHandler) DeleteSystem(c *gin.Context) {
+	orgID, ok := orgIDFromCtx(c)
+	if !ok {
+		return
+	}
+	vehicleID, ok := parseUUIDParam(c, "vehicleID")
+	if !ok {
+		return
+	}
+	systemKey := c.Param("systemKey")
+	if systemKey == "" {
+		apierr.BadRequest(c, "systemKey is required.")
+		return
+	}
+
+	if err := h.q.DeleteVehicleSystem(c.Request.Context(), store.DeleteVehicleSystemParams{
+		VehicleID: vehicleID,
+		OrgID:     orgID,
+		System:    systemKey,
+	}); err != nil {
+		h.log.Error("DeleteVehicleSystem", zap.Error(err), zap.String("system", systemKey))
+		apierr.Internal(c)
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"deleted": true, "system": systemKey})
+}
+
 // ----------------------------------------------------------------
 // helpers — shared by all handlers in this package
 // ----------------------------------------------------------------

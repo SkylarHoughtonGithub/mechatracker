@@ -38,3 +38,10 @@ DELETE FROM vehicles
 WHERE id = $1
   AND org_id = $2
 RETURNING *;
+
+-- name: DeleteVehicleSystem :exec
+-- Deletes all repairs (and cascaded children) for a vehicle+system combination.
+DELETE FROM repairs
+WHERE vehicle_id = $1
+  AND org_id = $2
+  AND system = $3;

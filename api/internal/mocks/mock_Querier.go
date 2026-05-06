@@ -784,6 +784,53 @@ func (_c *MockQuerier_DeleteVehicle_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// DeleteVehicleSystem provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) DeleteVehicleSystem(ctx context.Context, arg store.DeleteVehicleSystemParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteVehicleSystem")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, store.DeleteVehicleSystemParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_DeleteVehicleSystem_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteVehicleSystem'
+type MockQuerier_DeleteVehicleSystem_Call struct {
+	*mock.Call
+}
+
+// DeleteVehicleSystem is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg store.DeleteVehicleSystemParams
+func (_e *MockQuerier_Expecter) DeleteVehicleSystem(ctx interface{}, arg interface{}) *MockQuerier_DeleteVehicleSystem_Call {
+	return &MockQuerier_DeleteVehicleSystem_Call{Call: _e.mock.On("DeleteVehicleSystem", ctx, arg)}
+}
+
+func (_c *MockQuerier_DeleteVehicleSystem_Call) Run(run func(ctx context.Context, arg store.DeleteVehicleSystemParams)) *MockQuerier_DeleteVehicleSystem_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(store.DeleteVehicleSystemParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_DeleteVehicleSystem_Call) Return(_a0 error) *MockQuerier_DeleteVehicleSystem_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_DeleteVehicleSystem_Call) RunAndReturn(run func(context.Context, store.DeleteVehicleSystemParams) error) *MockQuerier_DeleteVehicleSystem_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetGarageStats provides a mock function with given fields: ctx, orgID
 func (_m *MockQuerier) GetGarageStats(ctx context.Context, orgID uuid.UUID) (store.GetGarageStatsRow, error) {
 	ret := _m.Called(ctx, orgID)

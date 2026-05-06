@@ -65,6 +65,17 @@ export function useApi() {
           method: 'POST',
           body: JSON.stringify(body),
         }),
+      update: (id: string, body: {
+        year?: number; make?: string; model?: string; trim?: string; mileage?: number; vin?: string; unit_label?: string
+      }) =>
+        fetchApi<Vehicle>(`/v1/vehicles/${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify(body),
+        }),
+      delete: (id: string) =>
+        fetchApi<{ deleted: boolean; id: string }>(`/v1/vehicles/${id}`, { method: 'DELETE' }),
+      deleteSystem: (vehicleId: string, systemKey: string) =>
+        fetchApi<{ deleted: boolean; system: string }>(`/v1/vehicles/${vehicleId}/systems/${systemKey}`, { method: 'DELETE' }),
     },
 
     repairs: {
