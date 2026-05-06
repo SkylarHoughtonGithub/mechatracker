@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useGarage, useVehicleRepairs } from '@/lib/queries'
 import { useApi, type Repair } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import { DarkModal, CancelButton } from '@/app/components/modal'
+import { Chevron } from '@/app/components/chevron'
+import { PageSpinner } from '@/app/components/spinner'
 
 const STATUS_LABEL: Record<string, string> = {
   draft:         'Draft',
@@ -36,8 +39,13 @@ export default function SystemRepairsPage({ params }: { params: Promise<{ vehicl
     if (vLabel) document.title = `${sLabel} · ${vLabel}`
   }, [garage, vehicleId, system])
 
-  if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
-  if (error) return <div className="p-8 text-sm text-red-500">Error: {error.message}</div>
+  if (isLoading) return <PageSpinner />
+  if (error) return (
+    <div className="p-8 text-sm text-red-500 text-center">
+      <p>Failed to load repairs.</p>
+      <p className="text-zinc-600 mt-1">{error.message}</p>
+    </div>
+  )
 
   const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
   const systemInfo = vehicle?.systems?.find(s => s.id === system)
@@ -45,7 +53,7 @@ export default function SystemRepairsPage({ params }: { params: Promise<{ vehicl
   const systemLabel = systemInfo?.label ?? system
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-6 sm:p-8">
       <div className="max-w-2xl mx-auto">
         <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-6 flex-wrap">
           <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
@@ -99,40 +107,31 @@ function AddRepairModal({ vehicleId, system, systemLabel, onClose }: { vehicleId
       await qc.invalidateQueries({ queryKey: ['garage'] })
       onClose()
       router.push(`/vehicles/${vehicleId}/${system}/${repair.id}`)
-    } catch (e: any) { setErr(e.message ?? 'Something went wrong.'); setSaving(false) }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Something went wrong.'); setSaving(false) }
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-base font-semibold text-zinc-100">Add repair</span>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+    <DarkModal title="Add repair" onClose={onClose}>
+      <div className="space-y-3">
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">System</label>
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-500">{systemLabel}</div>
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Title <span className="text-red-400">*</span></label>
+          <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Brake pad replacement" autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') submit() }}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        {err && <p className="text-xs text-red-400">{err}</p>}
+        <div className="flex gap-2 pt-1">
+          <CancelButton onClick={onClose} />
+          <button onClick={submit} disabled={saving} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
+            {saving ? 'Creating…' : 'Create repair'}
           </button>
         </div>
-        <div className="space-y-3">
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">System</label>
-            <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-500">{systemLabel}</div>
-          </div>
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Title <span className="text-red-400">*</span></label>
-            <input type="text" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Brake pad replacement" autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') submit() }}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          {err && <p className="text-xs text-red-400">{err}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors">Cancel</button>
-            <button onClick={submit} disabled={saving} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
-              {saving ? 'Creating…' : 'Create repair'}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </DarkModal>
   )
 }
 
@@ -164,13 +163,5 @@ function RepairRow({ repair, vehicleId, system }: { repair: Repair; vehicleId: s
         <div className="mt-2 text-xs text-zinc-600">Parts: <span className="text-zinc-400 font-medium">${repair.total_parts_cost}</span></div>
       )}
     </Link>
-  )
-}
-
-function Chevron() {
-  return (
-    <svg className="w-3 h-3 text-zinc-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
   )
 }

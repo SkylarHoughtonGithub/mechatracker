@@ -6,6 +6,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { useRepair, useVehicleSystemLabel, useNotes, useGarage } from '@/lib/queries'
 import { useApi, type RepairStep, type Part, type NoteWithAuthor } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
+import { DarkModal, ModalActions, ConfirmModal } from '@/app/components/modal'
+import { Chevron } from '@/app/components/chevron'
+import { PageSpinner } from '@/app/components/spinner'
 
 const REPAIR_STATUS_LABEL: Record<string, string> = {
   draft:         'Draft',
@@ -77,9 +80,20 @@ export default function RepairCardPage() {
     if (repair?.title) document.title = `${repair.title} · ${systemLabel}`
   }, [repair?.title, systemLabel])
 
-  if (isLoading) return <LoadingState />
-  if (error)     return <ErrorState message={(error as Error).message} />
-  if (!repair)   return <ErrorState message="Repair not found." />
+  if (isLoading) return <PageSpinner />
+  if (error)     return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="text-sm text-red-500 text-center">
+        <p>Failed to load repair.</p>
+        <p className="text-zinc-600 mt-1">{(error as Error).message}</p>
+      </div>
+    </div>
+  )
+  if (!repair)   return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <div className="text-sm text-zinc-500">Repair not found.</div>
+    </div>
+  )
 
   const steps      = (repair.steps  ?? []) as RepairStep[]
   const parts      = (repair.parts  ?? []) as Part[]
@@ -93,7 +107,7 @@ export default function RepairCardPage() {
   const isCompleted = status === 'completed'
   const isEditable  = status === 'draft' || status === 'in_progress'
 
-  async function toggleStep(stepId: string, currentlyDone: boolean) {
+  async function toggleStep(stepId: string) {
     if (togglingStep) return
     setTogglingStep(stepId)
     try {
@@ -148,7 +162,8 @@ export default function RepairCardPage() {
 
   return (
     <div className="min-h-screen bg-black text-white">
-      <header className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-10">
+      {/* Sticky page header — sits below the global app header (top-12) */}
+      <header className="bg-zinc-950 border-b border-zinc-800 sticky top-12 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-3 flex-wrap">
             <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
@@ -229,7 +244,7 @@ export default function RepairCardPage() {
               {steps.map((step, i) => (
                 <button
                   key={step.id}
-                  onClick={() => toggleStep(step.id!, step.completed ?? false)}
+                  onClick={() => toggleStep(step.id!)}
                   disabled={!!togglingStep || isCompleted}
                   className={`w-full text-left px-4 py-3.5 flex items-start gap-3.5 transition-colors
                     ${step.completed ? 'bg-green-950/30' : 'hover:bg-zinc-800/50'}
@@ -461,10 +476,13 @@ export default function RepairCardPage() {
       )}
 
       {deleteModalOpen && (
-        <ConfirmDeleteModal
+        <ConfirmModal
+          title="Delete repair?"
+          message="This repair will be recoverable for 30 days. This action cannot be undone from the app."
+          confirmLabel="Delete repair"
+          danger
+          onConfirm={async () => { await deleteRepair() }}
           onClose={() => setDeleteModalOpen(false)}
-          onConfirm={deleteRepair}
-          confirming={deleting}
         />
       )}
 
@@ -536,8 +554,8 @@ function AddStepModal({
         torque_spec: torqueSpec.trim() || undefined,
       })
       await onSaved()
-    } catch (e: any) {
-      setErr(e.message ?? 'Something went wrong.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Something went wrong.')
       setSaving(false)
     }
   }
@@ -617,8 +635,8 @@ function AddPartModal({
         cost:        cost.trim() || undefined,
       })
       await onSaved()
-    } catch (e: any) {
-      setErr(e.message ?? 'Something went wrong.')
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Something went wrong.')
       setSaving(false)
     }
   }
@@ -678,75 +696,7 @@ function AddPartModal({
   )
 }
 
-// ── Shared modal primitives ───────────────────────────────────────────────────
-
-function DarkModal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-30 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-zinc-100">{title}</h2>
-          <button onClick={onClose} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function ModalActions({
-  onClose, onSubmit, saving, label,
-}: { onClose: () => void; onSubmit: () => void; saving: boolean; label: string }) {
-  return (
-    <div className="flex gap-2 pt-1">
-      <button
-        onClick={onClose}
-        className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={onSubmit}
-        disabled={saving}
-        className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors"
-      >
-        {saving ? 'Saving…' : label}
-      </button>
-    </div>
-  )
-}
-
-function ConfirmDeleteModal({
-  onClose, onConfirm, confirming,
-}: { onClose: () => void; onConfirm: () => void; confirming: boolean }) {
-  return (
-    <DarkModal title="Delete repair?" onClose={onClose}>
-      <p className="text-sm text-zinc-500 mb-6">
-        This repair will be recoverable for 30 days. This action cannot be undone from the app.
-      </p>
-      <div className="flex gap-2">
-        <button
-          onClick={onClose}
-          className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 font-medium text-sm py-2.5 rounded-xl transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={confirming}
-          className="flex-1 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white font-medium text-sm py-2.5 rounded-xl transition-colors"
-        >
-          {confirming ? 'Deleting…' : 'Delete repair'}
-        </button>
-      </div>
-    </DarkModal>
-  )
-}
+// ── Section ───────────────────────────────────────────────────────────────────
 
 function Section({
   title, count, accent, action, children,
@@ -775,6 +725,8 @@ function Section({
     </div>
   )
 }
+
+// ── Note Modal ────────────────────────────────────────────────────────────────
 
 function NoteModal({
   body, onChange, onSubmit, onClose, submitting,
@@ -805,29 +757,7 @@ function NoteModal({
   )
 }
 
-function LoadingState() {
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-sm text-zinc-600">Loading repair…</div>
-    </div>
-  )
-}
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="text-sm text-red-500">{message}</div>
-    </div>
-  )
-}
-
-function Chevron() {
-  return (
-    <svg className="w-3 h-3 text-zinc-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-  )
-}
+// ── Icons ─────────────────────────────────────────────────────────────────────
 
 function CheckIcon() {
   return (
