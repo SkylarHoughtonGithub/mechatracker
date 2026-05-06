@@ -7,6 +7,9 @@ import { useParams, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useGarage } from '@/lib/queries'
 import { useApi, type GarageVehicle } from '@/lib/api'
+import { DarkModal, CancelButton, ConfirmModal } from '@/app/components/modal'
+import { Chevron } from '@/app/components/chevron'
+import { PageSpinner } from '@/app/components/spinner'
 
 const ALL_SYSTEMS: { id: string; label: string; icon: string }[] = [
   { id: 'engine',       label: 'Engine',         icon: '⚙️'  },
@@ -72,8 +75,13 @@ export default function VehiclePage() {
     }
   }, [garage, vehicleId])
 
-  if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
-  if (error)     return <div className="p-8 text-sm text-red-500">Error: {(error as Error).message}</div>
+  if (isLoading) return <PageSpinner />
+  if (error)     return (
+    <div className="p-8 text-sm text-red-500 text-center">
+      <p>Failed to load vehicle.</p>
+      <p className="text-zinc-600 mt-1">{(error as Error).message}</p>
+    </div>
+  )
 
   const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
   if (!vehicle) return <div className="p-8 text-sm text-zinc-500">Vehicle not found.</div>
@@ -145,13 +153,11 @@ export default function VehiclePage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-6 sm:p-8">
       <div className="max-w-2xl mx-auto">
         <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-6">
           <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
-          <svg className="w-3 h-3 text-zinc-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-          </svg>
+          <Chevron />
           <span className="text-zinc-200">{label}</span>
         </nav>
 
@@ -168,6 +174,7 @@ export default function VehiclePage() {
               <button
                 onClick={() => setEditVehicleOpen(true)}
                 title="Edit vehicle"
+                aria-label="Edit vehicle"
                 className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-800"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -177,6 +184,7 @@ export default function VehiclePage() {
               <button
                 onClick={() => setDeleteVehicleOpen(true)}
                 title="Delete vehicle"
+                aria-label="Delete vehicle"
                 className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors rounded-lg hover:bg-zinc-800"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -228,10 +236,10 @@ export default function VehiclePage() {
                   key={system.id}
                   className={`flex items-center gap-3 bg-zinc-900 rounded-xl border border-zinc-800 p-4 transition-opacity ${isHidden ? 'opacity-40' : ''}`}
                 >
-                  {/* visibility toggle */}
                   <button
                     onClick={() => toggleSystemVisibility(system.id)}
                     title={isHidden ? 'Show system' : 'Hide system'}
+                    aria-label={isHidden ? `Show ${displayLabel}` : `Hide ${displayLabel}`}
                     className="text-zinc-500 hover:text-zinc-200 transition-colors flex-shrink-0"
                   >
                     {isHidden ? (
@@ -261,21 +269,21 @@ export default function VehiclePage() {
                     {stats?.has_open && (
                       <span className="text-xs bg-blue-950 text-blue-400 px-2 py-0.5 rounded-full font-medium mr-1">open</span>
                     )}
-                    {/* edit label/icon */}
                     <button
-                        onClick={() => setEditingSystem({ id: system.id, label: displayLabel, icon: displayIcon })}
-                        title="Edit system"
-                        className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-800"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-                        </svg>
-                      </button>
-                    {/* delete — custom systems only */}
+                      onClick={() => setEditingSystem({ id: system.id, label: displayLabel, icon: displayIcon })}
+                      title="Edit system"
+                      aria-label={`Edit ${displayLabel}`}
+                      className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-800"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                      </svg>
+                    </button>
                     {system.isCustom && (
                       <button
                         onClick={() => setDeleteSystemId(system.id)}
                         title="Delete system"
+                        aria-label={`Delete ${displayLabel}`}
                         className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors rounded-lg hover:bg-zinc-800"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
@@ -318,13 +326,8 @@ export default function VehiclePage() {
         </div>
       </div>
 
-      {/* Add custom system modal */}
       {customModalOpen && (
-        <DarkModal onClose={() => setCustomModalOpen(false)}>
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-base font-semibold text-zinc-100">Add system</span>
-            <CloseButton onClick={() => setCustomModalOpen(false)} />
-          </div>
+        <DarkModal title="Add system" onClose={() => setCustomModalOpen(false)}>
           <label className="block text-xs text-zinc-500 mb-1.5">System name</label>
           <input
             type="text"
@@ -335,7 +338,7 @@ export default function VehiclePage() {
             onKeyDown={e => { if (e.key === 'Enter') goToCustomSystem() }}
             className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3.5 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-zinc-600 mt-2 mb-5">You'll land on the repair list for this system.</p>
+          <p className="text-xs text-zinc-600 mt-2 mb-5">You&apos;ll land on the repair list for this system.</p>
           <div className="flex gap-2">
             <CancelButton onClick={() => setCustomModalOpen(false)} />
             <button onClick={goToCustomSystem} disabled={!customSystem.trim()} className="flex-1 bg-zinc-100 hover:bg-white disabled:opacity-40 text-zinc-900 font-medium text-sm py-2.5 rounded-xl transition-colors">
@@ -345,12 +348,10 @@ export default function VehiclePage() {
         </DarkModal>
       )}
 
-      {/* Edit vehicle modal */}
       {editVehicleOpen && (
         <EditVehicleModal vehicle={vehicle} onClose={() => setEditVehicleOpen(false)} />
       )}
 
-      {/* Delete vehicle confirm */}
       {deleteVehicleOpen && (
         <ConfirmModal
           title="Delete vehicle"
@@ -362,7 +363,6 @@ export default function VehiclePage() {
         />
       )}
 
-      {/* Edit system modal */}
       {editingSystem && (
         <EditSystemModal
           system={editingSystem}
@@ -371,7 +371,6 @@ export default function VehiclePage() {
         />
       )}
 
-      {/* Delete system confirm */}
       {deleteSystemId && (() => {
         const sys = allDisplayed.find(s => s.id === deleteSystemId)
         const displayLabel = prefs.systemLabels[deleteSystemId] ?? sys?.label ?? deleteSystemId
@@ -416,18 +415,14 @@ function EditVehicleModal({ vehicle, onClose }: { vehicle: GarageVehicle; onClos
       })
       await qc.invalidateQueries({ queryKey: ['garage'] })
       onClose()
-    } catch (e: any) { setErr(e.message ?? 'Something went wrong.') }
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Something went wrong.') }
     finally { setSaving(false) }
   }
 
   return (
-    <DarkModal onClose={onClose}>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-base font-semibold text-zinc-100">Edit vehicle</span>
-        <CloseButton onClick={onClose} />
-      </div>
+    <DarkModal title="Edit vehicle" onClose={onClose}>
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           {[
             { label: 'Year *',  value: year,  set: setYear,  placeholder: '2019', type: 'number' },
             { label: 'Make *',  value: make,  set: setMake,  placeholder: 'Ford',  type: 'text'   },
@@ -490,17 +485,14 @@ function EditSystemModal({ system, onSave, onClose }: {
   }
 
   return (
-    <DarkModal onClose={onClose}>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-base font-semibold text-zinc-100">Edit system</span>
-        <CloseButton onClick={onClose} />
-      </div>
+    <DarkModal title="Edit system" onClose={onClose}>
       <div className="flex gap-3 mb-3">
         <div className="flex-shrink-0">
           <label className="block text-xs text-zinc-500 mb-1.5">Icon</label>
           <div className="relative" ref={pickerRef}>
             <button
               onClick={() => setPickerOpen(o => !o)}
+              aria-label="Choose emoji"
               className="w-12 h-10 bg-zinc-800 border border-zinc-700 rounded-xl text-xl flex items-center justify-center hover:border-zinc-500 transition-colors"
             >
               {icon}
@@ -509,7 +501,7 @@ function EditSystemModal({ system, onSave, onClose }: {
               <div className="absolute top-12 left-0 z-50">
                 <EmojiPicker
                   onEmojiClick={(e: EmojiClickData) => { setIcon(e.emoji); setPickerOpen(false) }}
-                  theme={'dark' as any}
+                  theme={'dark' as Parameters<typeof EmojiPicker>[0]['theme']}
                   skinTonesDisabled
                   searchPlaceholder="Search emoji…"
                   height={380}
@@ -538,68 +530,5 @@ function EditSystemModal({ system, onSave, onClose }: {
         </button>
       </div>
     </DarkModal>
-  )
-}
-
-function ConfirmModal({ title, message, confirmLabel, danger, onConfirm, onClose }: {
-  title: string; message: string; confirmLabel: string; danger?: boolean
-  onConfirm: () => Promise<void>; onClose: () => void
-}) {
-  const [loading, setLoading] = useState(false)
-  const [err, setErr] = useState('')
-
-  async function handleConfirm() {
-    setLoading(true); setErr('')
-    try { await onConfirm() }
-    catch (e: any) { setErr(e.message ?? 'Something went wrong.'); setLoading(false) }
-  }
-
-  return (
-    <DarkModal onClose={onClose}>
-      <div className="mb-2 text-base font-semibold text-zinc-100">{title}</div>
-      <p className="text-sm text-zinc-400 mb-5">{message}</p>
-      {err && <p className="text-xs text-red-400 mb-3">{err}</p>}
-      <div className="flex gap-2">
-        <CancelButton onClick={onClose} disabled={loading} />
-        <button
-          onClick={handleConfirm}
-          disabled={loading}
-          className={`flex-1 font-medium text-sm py-2.5 rounded-xl transition-colors disabled:opacity-40 ${
-            danger ? 'bg-red-600 hover:bg-red-500 text-white' : 'bg-zinc-100 hover:bg-white text-zinc-900'
-          }`}
-        >
-          {loading ? 'Deleting…' : confirmLabel}
-        </button>
-      </div>
-    </DarkModal>
-  )
-}
-
-function DarkModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-5">
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function CloseButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button onClick={onClick} className="text-zinc-600 hover:text-zinc-300 transition-colors">
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    </button>
-  )
-}
-
-function CancelButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <button onClick={onClick} disabled={disabled} className="flex-1 border border-zinc-700 text-zinc-400 hover:bg-zinc-800 disabled:opacity-40 font-medium text-sm py-2.5 rounded-xl transition-colors">
-      Cancel
-    </button>
   )
 }

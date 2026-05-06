@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useGarage, useVehicleHistory } from '@/lib/queries'
 import type { RepairHistory } from '@/lib/api'
+import { Stat } from '@/app/components/stat'
+import { Chevron } from '@/app/components/chevron'
+import { PageSpinner } from '@/app/components/spinner'
 
 const SYSTEM_LABELS: Record<string, string> = {
   engine:       'Engine',
@@ -41,15 +44,19 @@ export default function VehicleHistoryPage() {
     }
   }, [garage, vehicleId])
 
-  if (isLoading) return <div className="p-8 text-sm text-zinc-500">Loading...</div>
-  if (error) return <div className="p-8 text-sm text-red-500">Error: {(error as Error).message}</div>
+  if (isLoading) return <PageSpinner />
+  if (error) return (
+    <div className="p-8 text-sm text-red-500 text-center">
+      <p>Failed to load history.</p>
+      <p className="text-zinc-600 mt-1">{(error as Error).message}</p>
+    </div>
+  )
 
   const vehicle = garage?.vehicles?.find(v => v.id === vehicleId)
   const vehicleLabel = vehicle
     ? `${vehicle.year} ${vehicle.make} ${vehicle.model}${vehicle.trim ? ` ${vehicle.trim}` : ''}`
     : '...'
 
-  // Build system filter options from what's actually in history
   const systems = ['all', ...Array.from(new Set(history?.map(h => h.system).filter((s): s is string => !!s) ?? []))]
 
   const filtered = activeSystem === 'all'
@@ -60,8 +67,8 @@ export default function VehicleHistoryPage() {
 
   return (
     <main className="min-h-screen bg-black text-white">
-      {/* Header */}
-      <div className="bg-zinc-950 border-b border-zinc-800 sticky top-0 z-10">
+      {/* Sticky page header — sits below the global app header (top-12) */}
+      <div className="bg-zinc-950 border-b border-zinc-800 sticky top-12 z-10">
         <div className="max-w-2xl mx-auto px-6 py-4">
           <nav className="flex items-center gap-1.5 text-xs text-zinc-500 mb-3 flex-wrap">
             <Link href="/" className="hover:text-zinc-300 transition-colors">{garage?.org_name ?? 'Garage'}</Link>
@@ -77,14 +84,12 @@ export default function VehicleHistoryPage() {
 
       <div className="max-w-2xl mx-auto px-6 py-6 space-y-4">
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
-          <StatCard label="Total repairs" value={history?.length ?? 0} />
-          <StatCard label="Parts spend" value={`$${totalCost.toFixed(0)}`} />
-          <StatCard label="Systems" value={systems.length - 1} />
+          <Stat label="Total repairs" value={history?.length ?? 0} />
+          <Stat label="Parts spend" value={`$${totalCost.toFixed(0)}`} />
+          <Stat label="Systems" value={systems.length - 1} />
         </div>
 
-        {/* System filter chips */}
         {systems.length > 1 && (
           <div className="flex gap-2 flex-wrap">
             {systems.map(sys => (
@@ -102,7 +107,6 @@ export default function VehicleHistoryPage() {
           </div>
         )}
 
-        {/* History list */}
         {filtered.length === 0 ? (
           <div className="rounded-xl border border-zinc-800 p-8 text-center text-sm text-zinc-600">
             No completed repairs{activeSystem !== 'all' ? ` for ${SYSTEM_LABELS[activeSystem] ?? activeSystem}` : ''}.
@@ -159,11 +163,11 @@ function HistoryCard({
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-            {(Number(entry.total_parts_cost) ?? 0) > 0 && (
+          {(Number(entry.total_parts_cost) ?? 0) > 0 && (
             <span className="text-sm font-medium text-zinc-300">
-                ${Number(entry.total_parts_cost).toFixed(0)}
+              ${Number(entry.total_parts_cost).toFixed(0)}
             </span>
-            )}
+          )}
           <svg
             className={`w-4 h-4 text-zinc-600 transition-transform ${expanded ? 'rotate-90' : ''}`}
             fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"
@@ -200,7 +204,7 @@ function HistoryCard({
             <div>
               <div className="text-xs text-zinc-600 mb-1.5">Parts used</div>
               <div className="space-y-1">
-                {parts.map((p: {name?: string; part_number?: string; cost?: number}, i: number) => (
+                {(parts as {name?: string; part_number?: string; cost?: number}[]).map((p, i) => (
                   <div key={i} className="flex justify-between text-xs">
                     <span className="text-zinc-400">
                       {p.name}{p.part_number && <span className="text-zinc-600 ml-1 font-mono">{p.part_number}</span>}
@@ -216,7 +220,7 @@ function HistoryCard({
             <div>
               <div className="text-xs text-zinc-600 mb-1.5">Notes</div>
               <div className="space-y-1.5">
-                {notes.map((n: {body?: string; author_name?: string}, i: number) => (
+                {(notes as {body?: string; author_name?: string}[]).map((n, i) => (
                   <div key={i} className="text-xs text-zinc-400 leading-relaxed">
                     {n.body}
                     {n.author_name && <span className="text-zinc-600 ml-1">— {n.author_name}</span>}
@@ -231,29 +235,11 @@ function HistoryCard({
   )
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-3">
-      <div className="text-xs text-zinc-500 mb-1">{label}</div>
-      <div className="text-xl font-semibold text-zinc-100">{value}</div>
-    </div>
-  )
-}
-
-function Chevron() {
-  return (
-    <svg className="w-3 h-3 text-zinc-700 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-    </svg>
-  )
-}
-
-function parseSnapshot(snapshot: unknown): any[] {
+function parseSnapshot(snapshot: unknown): unknown[] {
   if (!snapshot) return []
   if (Array.isArray(snapshot)) return snapshot
   if (typeof snapshot === 'string') {
     try {
-      // base64 decode first, then JSON parse
       const decoded = atob(snapshot)
       const parsed = JSON.parse(decoded)
       return Array.isArray(parsed) ? parsed : []
