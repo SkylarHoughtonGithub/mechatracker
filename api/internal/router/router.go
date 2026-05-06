@@ -97,6 +97,7 @@ func registerVehicleRoutes(rg *gin.RouterGroup, h *handler.VehicleHandler) {
 	v.GET("/:vehicleID", h.Get)
 	v.PATCH("/:vehicleID", h.Update)
 	v.DELETE("/:vehicleID", h.Delete)
+	v.DELETE("/:vehicleID/systems/:systemKey", h.DeleteSystem)
 	v.GET("/:vehicleID/repairs", h.ListRepairs)
 	v.GET("/:vehicleID/history", h.ListHistory)
 }

@@ -1351,6 +1351,61 @@
                 }
             }
         },
+        "/vehicles/{vehicleID}/systems/{systemKey}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Deletes all repairs (and their steps, parts, notes) for the given vehicle+system.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "vehicles"
+                ],
+                "summary": "Delete all repairs in a system for a vehicle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Vehicle UUID",
+                        "name": "vehicleID",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "System key (e.g. winch)",
+                        "name": "systemKey",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks/clerk": {
             "post": {
                 "description": "Receives and verifies Clerk webhook events. Handles user.created to provision org + user.",

@@ -1112,6 +1112,51 @@ paths:
               schema:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
+  "/vehicles/{vehicleID}/systems/{systemKey}":
+    delete:
+      security:
+        - BearerAuth: []
+      description: Deletes all repairs (and their steps, parts, notes) for the given
+        vehicle+system.
+      tags:
+        - vehicles
+      summary: Delete all repairs in a system for a vehicle
+      parameters:
+        - description: Vehicle UUID
+          name: vehicleID
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - description: System key (e.g. winch)
+          name: systemKey
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
+                  sponse"
   /webhooks/clerk:
     post:
       description: Receives and verifies Clerk webhook events. Handles user.created to

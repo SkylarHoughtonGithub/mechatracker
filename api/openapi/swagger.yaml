@@ -1487,6 +1487,43 @@ paths:
       summary: List repairs for a vehicle
       tags:
       - vehicles
+  /vehicles/{vehicleID}/systems/{systemKey}:
+    delete:
+      description: Deletes all repairs (and their steps, parts, notes) for the given
+        vehicle+system.
+      parameters:
+      - description: Vehicle UUID
+        format: uuid
+        in: path
+        name: vehicleID
+        required: true
+        type: string
+      - description: System key (e.g. winch)
+        in: path
+        name: systemKey
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete all repairs in a system for a vehicle
+      tags:
+      - vehicles
   /webhooks/clerk:
     post:
       consumes:
