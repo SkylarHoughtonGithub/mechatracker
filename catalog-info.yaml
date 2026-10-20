@@ -1,0 +1,19 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: mechatracker
+  description: Repair tracking platform for mechanics, shops, and fleets. Reference workload for the Skylab Go service and database golden-path templates.
+  labels:
+    skylab.io/system: mechatracker
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    backstage.io/kubernetes-id: mechatracker
+    argocd/app-selector: skylab.io/system=mechatracker
+    grafana/dashboard-selector: "tags @> 'mechatracker'"
+    grafana/alert-label-selector: "service=mechatracker-api"
+spec:
+  type: service
+  lifecycle: experimental
+  owner: platform
+  system: mechatracker
