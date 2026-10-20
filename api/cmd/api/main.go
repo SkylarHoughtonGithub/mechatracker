@@ -35,9 +35,13 @@ import (
 	"github.com/mechatracker/api/internal/config"
 	"github.com/mechatracker/api/internal/router"
 	"github.com/mechatracker/api/internal/store"
+	"github.com/mechatracker/api/internal/tracing"
 
 	_ "github.com/mechatracker/api/openapi"
 )
+
+// version is set at build time via -ldflags "-X main.version=<sha>".
+var version = "dev"
 
 func main() {
 	log, err := buildLogger()
@@ -54,8 +58,19 @@ func main() {
 
 	log.Info("starting mechatracker api",
 		zap.String("env", cfg.Env),
+		zap.String("version", version),
 		zap.Int("port", cfg.Port),
 	)
+
+	// ── Tracing ───────────────────────────────────────────────
+	// Non-fatal: a missing or unreachable OTel collector drops traces
+	// but keeps the API serving.
+	shutdownTracing := tracing.Init(context.Background(), cfg.Env, version, log)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		_ = shutdownTracing(ctx)
+	}()
 
 	// ── Database ──────────────────────────────────────────────
 	pool, err := pgxpool.New(context.Background(), cfg.DatabaseURL)

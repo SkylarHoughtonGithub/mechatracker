@@ -1,0 +1,19 @@
+site_name: mechatracker
+site_description: Repair tracking platform; reference workload for Skylab golden paths.
+docs_dir: docs
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Repository: architecture/repo.md
+      - Data model: architecture/data_model.md
+      - API: architecture/api.md
+      - Auth: architecture/auth.md
+      - Storage: architecture/storage.md
+      - UI: architecture/ui.md
+      - Hosting: architecture/hosting.md
+  - Development:
+      - Overview: development/overview.md
+      - Local dev: development/local_dev.md
+plugins:
+  - techdocs-core

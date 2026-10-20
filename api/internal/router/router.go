@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 	"go.uber.org/zap"
 
 	"github.com/mechatracker/api/internal/apierr"
@@ -36,13 +37,13 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	}))
 
 	r.Use(
+		otelgin.Middleware("mechatracker-api"),
 		middleware.RequestID,
 		middleware.Recovery(log),
 		middleware.Logger(log),
 	)
 
 	r.GET("/healthz", handleHealth)
-	r.GET("/health", handleHealth) // kept temporarily so existing probes don't break
 	r.GET("/ready", handleReady)
 
 	// ── Swagger UI (non-production only) ─────────────────────
