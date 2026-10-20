@@ -124,6 +124,18 @@ Lands after the Backstage database template exists (skylab-backstage plan.md, go
 
 ---
 
+## Release strategy
+
+Fleet-wide decision: release-please + Conventional Commits (see `skylab-gitops/plan.md`). To wire here:
+
+- [ ] Add `release-please-config.json` with `release-type: go` for the root package (`.`), `package-name: mechatracker-api`.
+- [ ] Add `.release-please-manifest.json` seeded with the current version.
+- [ ] Add `.github/workflows/release-please.yaml` running on push to `main` with `contents: write` + `pull-requests: write`.
+- [ ] Thread the release tag into the image build: the Dockerfile already accepts a `VERSION` ARG via `-X main.version=${VERSION}`; the CI workflow (`.github/workflows/api-ci.yaml`) picks up `${{ github.ref_name }}` on tag pushes.
+- [ ] PR titles use `feat(api):` / `fix(api):` / `chore:` etc. The `api/` scope keeps the door open for a second package when `web/` wires in its own release cadence.
+
+---
+
 ## Build order
 
 Phase 0 (Clerk out) must finish before Phase 1 ships, because the image we build and sign has to be the Google-auth version.
