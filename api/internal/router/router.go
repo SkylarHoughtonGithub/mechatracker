@@ -41,7 +41,8 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 		middleware.Logger(log),
 	)
 
-	r.GET("/health", handleHealth)
+	r.GET("/healthz", handleHealth)
+	r.GET("/health", handleHealth) // kept temporarily so existing probes don't break
 	r.GET("/ready", handleReady)
 
 	// ── Swagger UI (non-production only) ─────────────────────
@@ -54,12 +55,26 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 	gh := handler.NewGarageHandler(q, log)
 	rh := handler.NewRepairHandler(q, log)
 	ph := handler.NewPartsHandler(q, log)
-	wh := handler.NewClerkWebhookHandler(q, log, cfg.ClerkWebhookSecret)
+	ah := handler.NewAuthHandler(q, cfg, log)
+	oh := handler.NewOnboardingHandler(q, cfg, log)
 
-	r.POST("/webhooks/clerk", wh.HandleClerkWebhook)
+	// Routes that establish or inspect a session. These accept either a
+	// Google ID-token Bearer (first-time sign-in) or an existing session
+	// cookie, and do NOT require a users row.
+	auth := r.Group("")
+	auth.Use(middleware.Auth(cfg, log))
+	{
+		auth.POST("/auth/google", ah.Google)
+		auth.POST("/auth/logout", ah.Logout)
+		auth.GET("/auth/me", ah.Me)
+		auth.POST("/orgs", oh.CreateOrg)
+		auth.POST("/invites/:token/accept", oh.AcceptInvite)
+	}
+
+	// Tenant routes — require a session that resolves to a users row.
 	v1 := r.Group("/v1")
 	v1.Use(middleware.Auth(cfg, log))
-	v1.Use(middleware.UserLookup(q, log))
+	v1.Use(middleware.RequireUser(q, log))
 	{
 		registerVehicleRoutes(v1, vh)
 		registerRepairRoutes(v1, rh, ph)
@@ -69,6 +84,7 @@ func New(cfg *config.Config, log *zap.Logger, q store.Querier) *gin.Engine {
 		org.Use(middleware.RequireOrg)
 		{
 			registerOrgRoutes(org)
+			org.POST("/invites", middleware.RequireRole("owner", "admin"), oh.CreateInvite)
 		}
 	}
 

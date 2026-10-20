@@ -114,9 +114,9 @@ WHERE id = $1
 -- User Queries
 -- ============================================================
 
--- name: GetUserByClerkID :one
+-- name: GetUserByGoogleSub :one
 SELECT * FROM users
-WHERE clerk_id = $1
+WHERE google_sub = $1
 LIMIT 1;
 
 -- name: GetUserByID :one
@@ -125,10 +125,10 @@ WHERE id = $1
 LIMIT 1;
 
 -- name: CreateUser :one
--- Called from the Clerk webhook handler on new user signup.
--- The org is created first, then this is called in the same tx.
-INSERT INTO users (clerk_id, org_id, role, email, name)
-VALUES ($1, $2, $3, $4, $5)
+-- Called from POST /orgs (new org) and POST /invites/{token}/accept.
+-- The org must exist first (CreateOrg for Path A, invite.org_id for Path B).
+INSERT INTO users (google_sub, org_id, role, email, email_verified, name, picture_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: ListOrgMembers :many
@@ -141,6 +141,48 @@ UPDATE users SET role = @role::user_role
 WHERE id = @id
   AND org_id = @org_id
 RETURNING *;
+
+-- ============================================================
+-- Invite Queries
+-- ============================================================
+
+-- name: CreateInvite :one
+-- Called from POST /orgs/invites. expires_at is now() + 24h, set by the handler.
+INSERT INTO invites (org_id, email, role, token, invited_by, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *;
+
+-- name: GetInviteByToken :one
+-- Returns the invite row regardless of status; handler decides whether it's
+-- still valid (expired? consumed?). This keeps the "why can't I accept this?"
+-- error message precise.
+SELECT * FROM invites
+WHERE token = $1
+LIMIT 1;
+
+-- name: ConsumeInvite :one
+-- Idempotent-ish: only stamps consumed_at if it is still NULL. Returns the
+-- updated row, or zero rows if the invite was already consumed (handler maps
+-- that to a 409).
+UPDATE invites SET consumed_at = now()
+WHERE id = $1
+  AND consumed_at IS NULL
+  AND expires_at > now()
+RETURNING *;
+
+-- name: ListPendingInvitesForOrg :many
+SELECT * FROM invites
+WHERE org_id = $1
+  AND consumed_at IS NULL
+  AND expires_at > now()
+ORDER BY created_at DESC;
+
+-- name: DeleteInvite :exec
+-- Owner/admin can rescind a pending invite before it's consumed.
+DELETE FROM invites
+WHERE id = $1
+  AND org_id = $2
+  AND consumed_at IS NULL;
 
 -- ============================================================
 -- Deleted Items Queries
@@ -161,8 +203,8 @@ WHERE repair_id = $1
 ORDER BY saved_at ASC;
 
 -- name: CreateOrg :one
--- Called from the cClerk webhook handler when a new user signs up.
--- a personal org is created first, then CreateUser is called in the same tx.
+-- Called from POST /orgs after Google sign-in. A personal org is created
+-- first, then CreateUser is called with the new org's id.
 INSERT INTO organizations (name, slug, plan, personal)
 VALUES ($1, $2, 'personal', true)
 RETURNING *;

@@ -44,6 +44,34 @@ func (q *Queries) CompleteStep(ctx context.Context, arg CompleteStepParams) (Rep
 	return i, err
 }
 
+const consumeInvite = `-- name: ConsumeInvite :one
+UPDATE invites SET consumed_at = now()
+WHERE id = $1
+  AND consumed_at IS NULL
+  AND expires_at > now()
+RETURNING id, org_id, email, role, token, invited_by, expires_at, consumed_at, created_at
+`
+
+// Idempotent-ish: only stamps consumed_at if it is still NULL. Returns the
+// updated row, or zero rows if the invite was already consumed (handler maps
+// that to a 409).
+func (q *Queries) ConsumeInvite(ctx context.Context, id uuid.UUID) (Invite, error) {
+	row := q.db.QueryRow(ctx, consumeInvite, id)
+	var i Invite
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.InvitedBy,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const countSteps = `-- name: CountSteps :one
 SELECT
     COUNT(*)                            AS total,
@@ -62,6 +90,50 @@ func (q *Queries) CountSteps(ctx context.Context, repairID uuid.UUID) (CountStep
 	row := q.db.QueryRow(ctx, countSteps, repairID)
 	var i CountStepsRow
 	err := row.Scan(&i.Total, &i.Completed)
+	return i, err
+}
+
+const createInvite = `-- name: CreateInvite :one
+
+INSERT INTO invites (org_id, email, role, token, invited_by, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, org_id, email, role, token, invited_by, expires_at, consumed_at, created_at
+`
+
+type CreateInviteParams struct {
+	OrgID     uuid.UUID          `json:"org_id"`
+	Email     string             `json:"email"`
+	Role      UserRole           `json:"role"`
+	Token     string             `json:"token"`
+	InvitedBy uuid.UUID          `json:"invited_by"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+}
+
+// ============================================================
+// Invite Queries
+// ============================================================
+// Called from POST /orgs/invites. expires_at is now() + 24h, set by the handler.
+func (q *Queries) CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error) {
+	row := q.db.QueryRow(ctx, createInvite,
+		arg.OrgID,
+		arg.Email,
+		arg.Role,
+		arg.Token,
+		arg.InvitedBy,
+		arg.ExpiresAt,
+	)
+	var i Invite
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.InvitedBy,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
@@ -101,8 +173,8 @@ type CreateOrgParams struct {
 	Slug string `json:"slug"`
 }
 
-// Called from the cClerk webhook handler when a new user signs up.
-// a personal org is created first, then CreateUser is called in the same tx.
+// Called from POST /orgs after Google sign-in. A personal org is created
+// first, then CreateUser is called with the new org's id.
 func (q *Queries) CreateOrg(ctx context.Context, arg CreateOrgParams) (Organization, error) {
 	row := q.db.QueryRow(ctx, createOrg, arg.Name, arg.Slug)
 	var i Organization
@@ -196,40 +268,64 @@ func (q *Queries) CreateStep(ctx context.Context, arg CreateStepParams) (RepairS
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (clerk_id, org_id, role, email, name)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, clerk_id, org_id, role, email, name, created_at
+INSERT INTO users (google_sub, org_id, role, email, email_verified, name, picture_url)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, google_sub, org_id, role, email, email_verified, name, picture_url, created_at
 `
 
 type CreateUserParams struct {
-	ClerkID string    `json:"clerk_id"`
-	OrgID   uuid.UUID `json:"org_id"`
-	Role    UserRole  `json:"role"`
-	Email   string    `json:"email"`
-	Name    string    `json:"name"`
+	GoogleSub     string    `json:"google_sub"`
+	OrgID         uuid.UUID `json:"org_id"`
+	Role          UserRole  `json:"role"`
+	Email         string    `json:"email"`
+	EmailVerified bool      `json:"email_verified"`
+	Name          string    `json:"name"`
+	PictureUrl    *string   `json:"picture_url"`
 }
 
-// Called from the Clerk webhook handler on new user signup.
-// The org is created first, then this is called in the same tx.
+// Called from POST /orgs (new org) and POST /invites/{token}/accept.
+// The org must exist first (CreateOrg for Path A, invite.org_id for Path B).
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, createUser,
-		arg.ClerkID,
+		arg.GoogleSub,
 		arg.OrgID,
 		arg.Role,
 		arg.Email,
+		arg.EmailVerified,
 		arg.Name,
+		arg.PictureUrl,
 	)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkID,
+		&i.GoogleSub,
 		&i.OrgID,
 		&i.Role,
 		&i.Email,
+		&i.EmailVerified,
 		&i.Name,
+		&i.PictureUrl,
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const deleteInvite = `-- name: DeleteInvite :exec
+DELETE FROM invites
+WHERE id = $1
+  AND org_id = $2
+  AND consumed_at IS NULL
+`
+
+type DeleteInviteParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+}
+
+// Owner/admin can rescind a pending invite before it's consumed.
+func (q *Queries) DeleteInvite(ctx context.Context, arg DeleteInviteParams) error {
+	_, err := q.db.Exec(ctx, deleteInvite, arg.ID, arg.OrgID)
+	return err
 }
 
 const deleteNote = `-- name: DeleteNote :exec
@@ -276,6 +372,32 @@ func (q *Queries) DeleteStep(ctx context.Context, arg DeleteStepParams) error {
 	return err
 }
 
+const getInviteByToken = `-- name: GetInviteByToken :one
+SELECT id, org_id, email, role, token, invited_by, expires_at, consumed_at, created_at FROM invites
+WHERE token = $1
+LIMIT 1
+`
+
+// Returns the invite row regardless of status; handler decides whether it's
+// still valid (expired? consumed?). This keeps the "why can't I accept this?"
+// error message precise.
+func (q *Queries) GetInviteByToken(ctx context.Context, token string) (Invite, error) {
+	row := q.db.QueryRow(ctx, getInviteByToken, token)
+	var i Invite
+	err := row.Scan(
+		&i.ID,
+		&i.OrgID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.InvitedBy,
+		&i.ExpiresAt,
+		&i.ConsumedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getOrgByID = `-- name: GetOrgByID :one
 SELECT id, name, slug, plan, personal, created_at FROM organizations WHERE id = $1 LIMIT 1
 `
@@ -312,33 +434,35 @@ func (q *Queries) GetOrgBySlug(ctx context.Context, slug string) (Organization, 
 	return i, err
 }
 
-const getUserByClerkID = `-- name: GetUserByClerkID :one
+const getUserByGoogleSub = `-- name: GetUserByGoogleSub :one
 
-SELECT id, clerk_id, org_id, role, email, name, created_at FROM users
-WHERE clerk_id = $1
+SELECT id, google_sub, org_id, role, email, email_verified, name, picture_url, created_at FROM users
+WHERE google_sub = $1
 LIMIT 1
 `
 
 // ============================================================
 // User Queries
 // ============================================================
-func (q *Queries) GetUserByClerkID(ctx context.Context, clerkID string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByClerkID, clerkID)
+func (q *Queries) GetUserByGoogleSub(ctx context.Context, googleSub string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByGoogleSub, googleSub)
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkID,
+		&i.GoogleSub,
 		&i.OrgID,
 		&i.Role,
 		&i.Email,
+		&i.EmailVerified,
 		&i.Name,
+		&i.PictureUrl,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, clerk_id, org_id, role, email, name, created_at FROM users
+SELECT id, google_sub, org_id, role, email, email_verified, name, picture_url, created_at FROM users
 WHERE id = $1
 LIMIT 1
 `
@@ -348,11 +472,13 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkID,
+		&i.GoogleSub,
 		&i.OrgID,
 		&i.Role,
 		&i.Email,
+		&i.EmailVerified,
 		&i.Name,
+		&i.PictureUrl,
 		&i.CreatedAt,
 	)
 	return i, err
@@ -447,7 +573,7 @@ func (q *Queries) ListNotes(ctx context.Context, repairID uuid.UUID) ([]ListNote
 }
 
 const listOrgMembers = `-- name: ListOrgMembers :many
-SELECT id, clerk_id, org_id, role, email, name, created_at FROM users
+SELECT id, google_sub, org_id, role, email, email_verified, name, picture_url, created_at FROM users
 WHERE org_id = $1
 ORDER BY name ASC
 `
@@ -463,11 +589,13 @@ func (q *Queries) ListOrgMembers(ctx context.Context, orgID uuid.UUID) ([]User, 
 		var i User
 		if err := rows.Scan(
 			&i.ID,
-			&i.ClerkID,
+			&i.GoogleSub,
 			&i.OrgID,
 			&i.Role,
 			&i.Email,
+			&i.EmailVerified,
 			&i.Name,
+			&i.PictureUrl,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -508,6 +636,44 @@ func (q *Queries) ListParts(ctx context.Context, repairID uuid.UUID) ([]Part, er
 			&i.Status,
 			&i.Cost,
 			&i.Notes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPendingInvitesForOrg = `-- name: ListPendingInvitesForOrg :many
+SELECT id, org_id, email, role, token, invited_by, expires_at, consumed_at, created_at FROM invites
+WHERE org_id = $1
+  AND consumed_at IS NULL
+  AND expires_at > now()
+ORDER BY created_at DESC
+`
+
+func (q *Queries) ListPendingInvitesForOrg(ctx context.Context, orgID uuid.UUID) ([]Invite, error) {
+	rows, err := q.db.Query(ctx, listPendingInvitesForOrg, orgID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Invite{}
+	for rows.Next() {
+		var i Invite
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.Email,
+			&i.Role,
+			&i.Token,
+			&i.InvitedBy,
+			&i.ExpiresAt,
+			&i.ConsumedAt,
 			&i.CreatedAt,
 		); err != nil {
 			return nil, err
@@ -654,7 +820,7 @@ const updateMemberRole = `-- name: UpdateMemberRole :one
 UPDATE users SET role = $1::user_role
 WHERE id = $2
   AND org_id = $3
-RETURNING id, clerk_id, org_id, role, email, name, created_at
+RETURNING id, google_sub, org_id, role, email, email_verified, name, picture_url, created_at
 `
 
 type UpdateMemberRoleParams struct {
@@ -668,11 +834,13 @@ func (q *Queries) UpdateMemberRole(ctx context.Context, arg UpdateMemberRolePara
 	var i User
 	err := row.Scan(
 		&i.ID,
-		&i.ClerkID,
+		&i.GoogleSub,
 		&i.OrgID,
 		&i.Role,
 		&i.Email,
+		&i.EmailVerified,
 		&i.Name,
+		&i.PictureUrl,
 		&i.CreatedAt,
 	)
 	return i, err

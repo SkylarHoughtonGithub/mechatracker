@@ -13,19 +13,30 @@ import (
 
 type Querier interface {
 	CompleteStep(ctx context.Context, arg CompleteStepParams) (RepairStep, error)
+	// Idempotent-ish: only stamps consumed_at if it is still NULL. Returns the
+	// updated row, or zero rows if the invite was already consumed (handler maps
+	// that to a 409).
+	ConsumeInvite(ctx context.Context, id uuid.UUID) (Invite, error)
 	// Used to recalculate progress_pct after a complete/uncomplete.
 	CountSteps(ctx context.Context, repairID uuid.UUID) (CountStepsRow, error)
+	// ============================================================
+	// Invite Queries
+	// ============================================================
+	// Called from POST /orgs/invites. expires_at is now() + 24h, set by the handler.
+	CreateInvite(ctx context.Context, arg CreateInviteParams) (Invite, error)
 	CreateNote(ctx context.Context, arg CreateNoteParams) (RepairNote, error)
-	// Called from the cClerk webhook handler when a new user signs up.
-	// a personal org is created first, then CreateUser is called in the same tx.
+	// Called from POST /orgs after Google sign-in. A personal org is created
+	// first, then CreateUser is called with the new org's id.
 	CreateOrg(ctx context.Context, arg CreateOrgParams) (Organization, error)
 	CreatePart(ctx context.Context, arg CreatePartParams) (Part, error)
 	CreateRepair(ctx context.Context, arg CreateRepairParams) (Repair, error)
 	CreateStep(ctx context.Context, arg CreateStepParams) (RepairStep, error)
-	// Called from the Clerk webhook handler on new user signup.
-	// The org is created first, then this is called in the same tx.
+	// Called from POST /orgs (new org) and POST /invites/{token}/accept.
+	// The org must exist first (CreateOrg for Path A, invite.org_id for Path B).
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateVehicle(ctx context.Context, arg CreateVehicleParams) (Vehicle, error)
+	// Owner/admin can rescind a pending invite before it's consumed.
+	DeleteInvite(ctx context.Context, arg DeleteInviteParams) error
 	DeleteNote(ctx context.Context, arg DeleteNoteParams) error
 	DeletePart(ctx context.Context, arg DeletePartParams) error
 	DeleteRepair(ctx context.Context, arg DeleteRepairParams) error
@@ -41,6 +52,10 @@ type Querier interface {
 	// The handler collapses these into nested vehicle → []systems structs.
 	// Vehicles with no repairs appear once with NULL system columns.
 	GetGarageVehicles(ctx context.Context, orgID uuid.UUID) ([]GetGarageVehiclesRow, error)
+	// Returns the invite row regardless of status; handler decides whether it's
+	// still valid (expired? consumed?). This keeps the "why can't I accept this?"
+	// error message precise.
+	GetInviteByToken(ctx context.Context, token string) (Invite, error)
 	GetOrgByID(ctx context.Context, id uuid.UUID) (Organization, error)
 	GetOrgBySlug(ctx context.Context, slug string) (Organization, error)
 	// ============================================================
@@ -50,7 +65,7 @@ type Querier interface {
 	// ============================================================
 	// User Queries
 	// ============================================================
-	GetUserByClerkID(ctx context.Context, clerkID string) (User, error)
+	GetUserByGoogleSub(ctx context.Context, googleSub string) (User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	// ============================================================
 	// mechatracker — Vehicle Queries
@@ -72,6 +87,7 @@ type Querier interface {
 	// Parts Queries
 	// ============================================================
 	ListParts(ctx context.Context, repairID uuid.UUID) ([]Part, error)
+	ListPendingInvitesForOrg(ctx context.Context, orgID uuid.UUID) ([]Invite, error)
 	ListRepairHistory(ctx context.Context, arg ListRepairHistoryParams) ([]RepairHistory, error)
 	ListRepairsByVehicle(ctx context.Context, arg ListRepairsByVehicleParams) ([]Repair, error)
 	ListResources(ctx context.Context, repairID uuid.UUID) ([]Resource, error)

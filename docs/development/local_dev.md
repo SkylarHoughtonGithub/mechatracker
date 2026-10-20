@@ -61,7 +61,7 @@ Run `task generate` after any change to `queries/*.sql` or `migrations/*.up.sql`
 | Kubernetes | k3d (k3s in Docker) | DigitalOcean Droplets |
 | Container registry | Local k3d registry | DigitalOcean Container Registry |
 | Database | Official `postgres:17` StatefulSet | DigitalOcean Managed PostgreSQL |
-| Auth | Dev bypass (`CLERK_DEV_BYPASS=true`) | Clerk JWT verification |
+| Auth | Dev bypass (`DEV_AUTH_BYPASS=true`) | Google ID-token verification + session cookie |
 | File storage | Not running | DigitalOcean Spaces |
 
 ---
@@ -124,13 +124,19 @@ task db:new NAME=add_something
 | Dev org | `00000000-0000-0000-0000-000000000003` |
 | Dev user | `00000000-0000-0000-0000-000000000002` |
 
-These match the `DevOrgID` and `DevUserID` constants in `internal/middleware/auth.go` and are injected into every request when `CLERK_DEV_BYPASS=true`. This means `GET /v1/vehicles` returns vehicles scoped to the dev org without any Clerk setup.
+These match the `DevOrgID` and `DevUserID` constants in `internal/middleware/auth.go` and are injected into every request when `DEV_AUTH_BYPASS=true`. This means `GET /v1/vehicles` returns vehicles scoped to the dev org without any Google OAuth setup.
 
 ### Auth bypass
 
-`CLERK_DEV_BYPASS=true` in `values.dev.yaml` skips JWT verification entirely. All requests are treated as `DevUserID` / `DevOrgID` with role `org:admin`. The config validator prevents this flag from being set outside `ENV=development`.
+`DEV_AUTH_BYPASS=true` in `values.dev.yaml` skips Google ID-token verification entirely. All requests are treated as `DevUserID` / `DevOrgID` with role `owner`. The config validator prevents this flag from being set outside `ENV=development`.
 
-Full Clerk JWT verification (`rsaPEMFromJWK` in `middleware/auth.go`) is not yet implemented — it currently panics if called. This is intentional: the bypass covers all local dev needs and real Clerk auth will be wired in before staging is stood up. See `auth.md` for the current status.
+### Signing in with real Google (optional)
+
+If you want to exercise the real auth flow locally — Google button, ID-token verification, session cookie, invite flow — unset `DEV_AUTH_BYPASS` and provide a Google OAuth 2.0 client ID. Google OAuth accepts `http://localhost:3000` as a redirect URI; no tunnel is required.
+
+1. In Google Cloud Console, create an OAuth 2.0 Client ID of type "Web application" with `http://localhost:3000` as both the authorized origin and the authorized redirect URI (also add your dev subdomain if you use one).
+2. Set in `values.dev.local.yaml`: `GOOGLE_CLIENT_ID`, `SESSION_SIGNING_KEY` (any 32-byte random string), and `NEXT_PUBLIC_GOOGLE_CLIENT_ID` for the web pod.
+3. Browse to `http://localhost:3000`, sign in with Google; a brand-new account lands on the "create org or paste invite" screen.
 
 ### sqlc and mockery
 
@@ -140,53 +146,13 @@ Full Clerk JWT verification (`rsaPEMFromJWK` in `middleware/auth.go`) is not yet
 
 ---
 
-## Webhook tunneling (Clerk user.created)
-
-The Clerk webhook fires on real user signups and provisions the org + user row in your database. For this to work locally, Clerk needs a public HTTPS URL that routes to your local API.
-
-All services run as ClusterIP inside k8s, so nothing is exposed outside the cluster by default. The full chain is:
-
-```
-Clerk → ngrok → kubectl port-forward → mechatracker-api pod
-```
-
-### One-time setup
-
-**1. Install ngrok**
-```sh
-brew install ngrok
-```
-
-**2. Authenticate**
-
-Sign up at [ngrok.com](https://ngrok.com), then:
-```sh
-ngrok config add-authtoken <your-token>
-```
-
-**3. Set the webhook URL in Clerk — once**
-
-Clerk Dashboard → Webhooks → Add Endpoint:
-```
-https://<your-ngrok-subdomain>.ngrok-free.app/webhooks/clerk
-```
-Subscribe to: `user.created`
-
-Copy the **Signing Secret** (`whsec_...`) into:
-- `api/.env` → `CLERK_WEBHOOK_SECRET=whsec_...`
-- `infra/helm/mechatracker/values.dev.local.yaml` → `CLERK_WEBHOOK_SECRET: "whsec_..."`
-
-The ngrok free tier generates a new subdomain each session, so you'll need to update the Clerk URL each time unless you upgrade to a paid plan with a reserved domain.
-
----
-
-### Daily dev workflow
+## Daily dev workflow
 
 Port assignments:
-- `localhost:8080` — API (matches `NEXT_PUBLIC_API_URL`, ngrok tunnels here)
+- `localhost:8080` — API (matches `NEXT_PUBLIC_API_URL`)
 - `localhost:3000` — Web (browse here)
 
-When testing signup flows, use the tunnel task which starts everything together:
+Start the port-forwards:
 
 ```sh
 task dev:tunnels
@@ -195,26 +161,17 @@ task dev:tunnels
 This runs in parallel:
 - `kubectl port-forward svc/mechatracker-api 8080:8080`
 - `kubectl port-forward svc/mechatracker-web 3000:3000`
-- `ngrok http 8080`
 
-Browse to `http://localhost:3000`. After ngrok starts, copy the forwarding URL from its output and update the Clerk webhook endpoint URL.
+Browse to `http://localhost:3000`. With `DEV_AUTH_BYPASS=true` (default in `values.dev.yaml`) you are automatically signed in as the dev user. With real Google OAuth configured (see "Signing in with real Google" above) the sign-in button mints a session cookie against your Google account.
 
-The tunnel only needs to be running when testing real signups. For normal development with your existing seeded account, you don't need ngrok — just the port-forwards.
-
----
-
-### Testing the webhook
-
-Most realistic test: run `task dev:tunnels`, update the Clerk webhook URL with the new ngrok URL, then create a brand new account through the sign-up flow.
-
-To test provisioning logic without a real signup, use the Clerk dashboard → Webhooks → **Send Test Event** → `user.created` while the tunnel is running.
+There is no tunnel step — removing Clerk removed the only reason a public URL was needed in dev. The API's only outbound call for auth is Google's JWKS endpoint, which doesn't need inbound connectivity.
 
 ---
 
 ### Troubleshooting
 
-**404 from ngrok** — Check the Clerk webhook URL has the correct domain (`.ngrok-free.app` not `.ngrok-free.dev`) and includes the full path `/webhooks/clerk`.
-
 **CORS errors in browser** — The web port-forward is conflicting with the API on 8080. Make sure web is forwarded to 3000 and API to 8080, and browse to `localhost:3000`.
 
-**401 on /v1/garage after signup** — The webhook didn't fire or failed. Check ngrok output for the POST to `/webhooks/clerk` and look at API logs with `kubectl logs -n mechatracker-dev deploy/api`.
+**401 on tenant-scoped routes after Google sign-in** — The signed-in Google account has no `users` row yet. Hit `GET /auth/me` and confirm it returns `needs_onboarding: true`; complete the create-or-join flow before accessing other routes.
+
+**`idtoken: audience mismatch`** — `GOOGLE_CLIENT_ID` in the pod doesn't match the OAuth client the web app is using. Ensure both the API and the web pod are pointing at the same client ID.

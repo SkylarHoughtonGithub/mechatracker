@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -15,12 +16,22 @@ type Config struct {
 
 	DatabaseURL string
 
-	// ClerkDevBypass skips JWT verification and injects a synthetic user.
-	// Only allowed when Env == "development". Never set in staging/prod.
-	ClerkDevBypass     bool
-	ClerkJWKSURL       string
-	ClerkAudience      string
-	ClerkWebhookSecret string
+	// DevAuthBypass skips Google ID-token verification and injects a synthetic
+	// user. Only allowed when Env == "development". Never set in staging/prod.
+	DevAuthBypass bool
+
+	// Google OAuth — the API verifies ID tokens issued to this client ID and
+	// treats it as the ID-token audience.
+	GoogleClientID string
+	// GoogleAllowedHD, if set, restricts sign-in to a Google Workspace hosted
+	// domain (e.g. "example.com"). Leave empty to accept any Google account.
+	GoogleAllowedHD string
+
+	// Session cookie — signed JWT the browser carries after /auth/google.
+	SessionSigningKey   string
+	SessionCookieDomain string
+	SessionCookieSecure bool
+	SessionTTL          time.Duration
 
 	SpacesEndpoint  string
 	SpacesBucket    string
@@ -34,18 +45,21 @@ func Load() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
-		Port:               envInt("PORT", 8080),
-		Env:                envStr("ENV", "development"),
-		DatabaseURL:        envStr("DATABASE_URL", ""),
-		ClerkDevBypass:     envBool("CLERK_DEV_BYPASS", false),
-		ClerkJWKSURL:       envStr("CLERK_JWKS_URL", ""),
-		ClerkAudience:      envStr("CLERK_AUDIENCE", ""),
-		ClerkWebhookSecret: envStr("CLERK_WEBHOOK_SECRET", ""),
-		SpacesEndpoint:     envStr("SPACES_ENDPOINT", ""),
-		SpacesBucket:       envStr("SPACES_BUCKET", ""),
-		SpacesAccessKey:    envStr("SPACES_ACCESS_KEY", ""),
-		SpacesSecretKey:    envStr("SPACES_SECRET_KEY", ""),
-		SentryDSN:          envStr("SENTRY_DSN", ""),
+		Port:                envInt("PORT", 8080),
+		Env:                 envStr("ENV", "development"),
+		DatabaseURL:         envStr("DATABASE_URL", ""),
+		DevAuthBypass:       envBool("DEV_AUTH_BYPASS", false),
+		GoogleClientID:      envStr("GOOGLE_CLIENT_ID", ""),
+		GoogleAllowedHD:     envStr("GOOGLE_ALLOWED_HD", ""),
+		SessionSigningKey:   envStr("SESSION_SIGNING_KEY", ""),
+		SessionCookieDomain: envStr("SESSION_COOKIE_DOMAIN", ""),
+		SessionCookieSecure: envBool("SESSION_COOKIE_SECURE", true),
+		SessionTTL:          envDuration("SESSION_TTL", 12*time.Hour),
+		SpacesEndpoint:      envStr("SPACES_ENDPOINT", ""),
+		SpacesBucket:        envStr("SPACES_BUCKET", ""),
+		SpacesAccessKey:     envStr("SPACES_ACCESS_KEY", ""),
+		SpacesSecretKey:     envStr("SPACES_SECRET_KEY", ""),
+		SentryDSN:           envStr("SENTRY_DSN", ""),
 	}
 
 	return cfg, cfg.validate()
@@ -55,11 +69,19 @@ func (c *Config) validate() error {
 	if c.DatabaseURL == "" {
 		return fmt.Errorf("config: DATABASE_URL is required")
 	}
-	if !c.ClerkDevBypass && c.ClerkJWKSURL == "" {
-		return fmt.Errorf("config: CLERK_JWKS_URL must be set (or set CLERK_DEV_BYPASS=true for local dev)")
+	if c.DevAuthBypass && c.Env != "development" {
+		return fmt.Errorf("config: DEV_AUTH_BYPASS=true is not allowed in ENV=%s", c.Env)
 	}
-	if c.ClerkDevBypass && c.Env != "development" {
-		return fmt.Errorf("config: CLERK_DEV_BYPASS=true is not allowed in ENV=%s", c.Env)
+	if !c.DevAuthBypass {
+		if c.GoogleClientID == "" {
+			return fmt.Errorf("config: GOOGLE_CLIENT_ID must be set (or set DEV_AUTH_BYPASS=true for local dev)")
+		}
+		if c.SessionSigningKey == "" {
+			return fmt.Errorf("config: SESSION_SIGNING_KEY must be set (or set DEV_AUTH_BYPASS=true for local dev)")
+		}
+		if len(c.SessionSigningKey) < 32 {
+			return fmt.Errorf("config: SESSION_SIGNING_KEY must be at least 32 bytes")
+		}
 	}
 	return nil
 }
@@ -96,4 +118,16 @@ func envBool(key string, fallback bool) bool {
 		return fallback
 	}
 	return b
+}
+
+func envDuration(key string, fallback time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return fallback
+	}
+	return d
 }

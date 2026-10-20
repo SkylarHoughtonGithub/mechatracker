@@ -106,7 +106,7 @@ Planned pro features:
 - **Labor time logging** — start/stop timer per repair, stored against the repair record
 - **Parts cost markup** — apply shop margin to part costs, exportable as a line-item invoice
 - **Fleet dashboard** — multi-vehicle view across an org, open repairs by technician
-- **Team accounts** — technician assignment, fleet manager overview (built on Clerk Organizations)
+- **Team accounts** — technician assignment, fleet manager overview (built on mechatracker's own `organizations` + `users` tables; one `users` row per Google account, scoped to one org, with role `owner`/`admin`/`member` presented as Owner / Manager / Technician in the UI)
 - **Analytics** — cost per repair, parts spend over time, most common repairs per vehicle. Fleet managers love this.
 
 **Implementation note:** Pro tier is gated by `user.role` and/or a subscription flag (Stripe, Phase 6). The streamlined repair mode is a view toggle on the existing repair card component — not a separate route or separate data model. No feature should be built without the gate in place first to avoid accidental free access.

@@ -83,6 +83,63 @@ func (_c *MockQuerier_CompleteStep_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// ConsumeInvite provides a mock function with given fields: ctx, id
+func (_m *MockQuerier) ConsumeInvite(ctx context.Context, id uuid.UUID) (store.Invite, error) {
+	ret := _m.Called(ctx, id)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ConsumeInvite")
+	}
+
+	var r0 store.Invite
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) (store.Invite, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) store.Invite); ok {
+		r0 = rf(ctx, id)
+	} else {
+		r0 = ret.Get(0).(store.Invite)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_ConsumeInvite_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ConsumeInvite'
+type MockQuerier_ConsumeInvite_Call struct {
+	*mock.Call
+}
+
+// ConsumeInvite is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id uuid.UUID
+func (_e *MockQuerier_Expecter) ConsumeInvite(ctx interface{}, id interface{}) *MockQuerier_ConsumeInvite_Call {
+	return &MockQuerier_ConsumeInvite_Call{Call: _e.mock.On("ConsumeInvite", ctx, id)}
+}
+
+func (_c *MockQuerier_ConsumeInvite_Call) Run(run func(ctx context.Context, id uuid.UUID)) *MockQuerier_ConsumeInvite_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_ConsumeInvite_Call) Return(_a0 store.Invite, _a1 error) *MockQuerier_ConsumeInvite_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_ConsumeInvite_Call) RunAndReturn(run func(context.Context, uuid.UUID) (store.Invite, error)) *MockQuerier_ConsumeInvite_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // CountSteps provides a mock function with given fields: ctx, repairID
 func (_m *MockQuerier) CountSteps(ctx context.Context, repairID uuid.UUID) (store.CountStepsRow, error) {
 	ret := _m.Called(ctx, repairID)
@@ -136,6 +193,63 @@ func (_c *MockQuerier_CountSteps_Call) Return(_a0 store.CountStepsRow, _a1 error
 }
 
 func (_c *MockQuerier_CountSteps_Call) RunAndReturn(run func(context.Context, uuid.UUID) (store.CountStepsRow, error)) *MockQuerier_CountSteps_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// CreateInvite provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) CreateInvite(ctx context.Context, arg store.CreateInviteParams) (store.Invite, error) {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for CreateInvite")
+	}
+
+	var r0 store.Invite
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, store.CreateInviteParams) (store.Invite, error)); ok {
+		return rf(ctx, arg)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, store.CreateInviteParams) store.Invite); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Get(0).(store.Invite)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, store.CreateInviteParams) error); ok {
+		r1 = rf(ctx, arg)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_CreateInvite_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'CreateInvite'
+type MockQuerier_CreateInvite_Call struct {
+	*mock.Call
+}
+
+// CreateInvite is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg store.CreateInviteParams
+func (_e *MockQuerier_Expecter) CreateInvite(ctx interface{}, arg interface{}) *MockQuerier_CreateInvite_Call {
+	return &MockQuerier_CreateInvite_Call{Call: _e.mock.On("CreateInvite", ctx, arg)}
+}
+
+func (_c *MockQuerier_CreateInvite_Call) Run(run func(ctx context.Context, arg store.CreateInviteParams)) *MockQuerier_CreateInvite_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(store.CreateInviteParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_CreateInvite_Call) Return(_a0 store.Invite, _a1 error) *MockQuerier_CreateInvite_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_CreateInvite_Call) RunAndReturn(run func(context.Context, store.CreateInviteParams) (store.Invite, error)) *MockQuerier_CreateInvite_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -535,6 +649,53 @@ func (_c *MockQuerier_CreateVehicle_Call) Return(_a0 store.Vehicle, _a1 error) *
 }
 
 func (_c *MockQuerier_CreateVehicle_Call) RunAndReturn(run func(context.Context, store.CreateVehicleParams) (store.Vehicle, error)) *MockQuerier_CreateVehicle_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// DeleteInvite provides a mock function with given fields: ctx, arg
+func (_m *MockQuerier) DeleteInvite(ctx context.Context, arg store.DeleteInviteParams) error {
+	ret := _m.Called(ctx, arg)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteInvite")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, store.DeleteInviteParams) error); ok {
+		r0 = rf(ctx, arg)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// MockQuerier_DeleteInvite_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteInvite'
+type MockQuerier_DeleteInvite_Call struct {
+	*mock.Call
+}
+
+// DeleteInvite is a helper method to define mock.On call
+//   - ctx context.Context
+//   - arg store.DeleteInviteParams
+func (_e *MockQuerier_Expecter) DeleteInvite(ctx interface{}, arg interface{}) *MockQuerier_DeleteInvite_Call {
+	return &MockQuerier_DeleteInvite_Call{Call: _e.mock.On("DeleteInvite", ctx, arg)}
+}
+
+func (_c *MockQuerier_DeleteInvite_Call) Run(run func(ctx context.Context, arg store.DeleteInviteParams)) *MockQuerier_DeleteInvite_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(store.DeleteInviteParams))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_DeleteInvite_Call) Return(_a0 error) *MockQuerier_DeleteInvite_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *MockQuerier_DeleteInvite_Call) RunAndReturn(run func(context.Context, store.DeleteInviteParams) error) *MockQuerier_DeleteInvite_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -947,6 +1108,63 @@ func (_c *MockQuerier_GetGarageVehicles_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// GetInviteByToken provides a mock function with given fields: ctx, token
+func (_m *MockQuerier) GetInviteByToken(ctx context.Context, token string) (store.Invite, error) {
+	ret := _m.Called(ctx, token)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetInviteByToken")
+	}
+
+	var r0 store.Invite
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (store.Invite, error)); ok {
+		return rf(ctx, token)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) store.Invite); ok {
+		r0 = rf(ctx, token)
+	} else {
+		r0 = ret.Get(0).(store.Invite)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, token)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_GetInviteByToken_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetInviteByToken'
+type MockQuerier_GetInviteByToken_Call struct {
+	*mock.Call
+}
+
+// GetInviteByToken is a helper method to define mock.On call
+//   - ctx context.Context
+//   - token string
+func (_e *MockQuerier_Expecter) GetInviteByToken(ctx interface{}, token interface{}) *MockQuerier_GetInviteByToken_Call {
+	return &MockQuerier_GetInviteByToken_Call{Call: _e.mock.On("GetInviteByToken", ctx, token)}
+}
+
+func (_c *MockQuerier_GetInviteByToken_Call) Run(run func(ctx context.Context, token string)) *MockQuerier_GetInviteByToken_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_GetInviteByToken_Call) Return(_a0 store.Invite, _a1 error) *MockQuerier_GetInviteByToken_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_GetInviteByToken_Call) RunAndReturn(run func(context.Context, string) (store.Invite, error)) *MockQuerier_GetInviteByToken_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetOrgByID provides a mock function with given fields: ctx, id
 func (_m *MockQuerier) GetOrgByID(ctx context.Context, id uuid.UUID) (store.Organization, error) {
 	ret := _m.Called(ctx, id)
@@ -1118,27 +1336,27 @@ func (_c *MockQuerier_GetRepair_Call) RunAndReturn(run func(context.Context, sto
 	return _c
 }
 
-// GetUserByClerkID provides a mock function with given fields: ctx, clerkID
-func (_m *MockQuerier) GetUserByClerkID(ctx context.Context, clerkID string) (store.User, error) {
-	ret := _m.Called(ctx, clerkID)
+// GetUserByGoogleSub provides a mock function with given fields: ctx, googleSub
+func (_m *MockQuerier) GetUserByGoogleSub(ctx context.Context, googleSub string) (store.User, error) {
+	ret := _m.Called(ctx, googleSub)
 
 	if len(ret) == 0 {
-		panic("no return value specified for GetUserByClerkID")
+		panic("no return value specified for GetUserByGoogleSub")
 	}
 
 	var r0 store.User
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) (store.User, error)); ok {
-		return rf(ctx, clerkID)
+		return rf(ctx, googleSub)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, string) store.User); ok {
-		r0 = rf(ctx, clerkID)
+		r0 = rf(ctx, googleSub)
 	} else {
 		r0 = ret.Get(0).(store.User)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
-		r1 = rf(ctx, clerkID)
+		r1 = rf(ctx, googleSub)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1146,31 +1364,31 @@ func (_m *MockQuerier) GetUserByClerkID(ctx context.Context, clerkID string) (st
 	return r0, r1
 }
 
-// MockQuerier_GetUserByClerkID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserByClerkID'
-type MockQuerier_GetUserByClerkID_Call struct {
+// MockQuerier_GetUserByGoogleSub_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetUserByGoogleSub'
+type MockQuerier_GetUserByGoogleSub_Call struct {
 	*mock.Call
 }
 
-// GetUserByClerkID is a helper method to define mock.On call
+// GetUserByGoogleSub is a helper method to define mock.On call
 //   - ctx context.Context
-//   - clerkID string
-func (_e *MockQuerier_Expecter) GetUserByClerkID(ctx interface{}, clerkID interface{}) *MockQuerier_GetUserByClerkID_Call {
-	return &MockQuerier_GetUserByClerkID_Call{Call: _e.mock.On("GetUserByClerkID", ctx, clerkID)}
+//   - googleSub string
+func (_e *MockQuerier_Expecter) GetUserByGoogleSub(ctx interface{}, googleSub interface{}) *MockQuerier_GetUserByGoogleSub_Call {
+	return &MockQuerier_GetUserByGoogleSub_Call{Call: _e.mock.On("GetUserByGoogleSub", ctx, googleSub)}
 }
 
-func (_c *MockQuerier_GetUserByClerkID_Call) Run(run func(ctx context.Context, clerkID string)) *MockQuerier_GetUserByClerkID_Call {
+func (_c *MockQuerier_GetUserByGoogleSub_Call) Run(run func(ctx context.Context, googleSub string)) *MockQuerier_GetUserByGoogleSub_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *MockQuerier_GetUserByClerkID_Call) Return(_a0 store.User, _a1 error) *MockQuerier_GetUserByClerkID_Call {
+func (_c *MockQuerier_GetUserByGoogleSub_Call) Return(_a0 store.User, _a1 error) *MockQuerier_GetUserByGoogleSub_Call {
 	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *MockQuerier_GetUserByClerkID_Call) RunAndReturn(run func(context.Context, string) (store.User, error)) *MockQuerier_GetUserByClerkID_Call {
+func (_c *MockQuerier_GetUserByGoogleSub_Call) RunAndReturn(run func(context.Context, string) (store.User, error)) *MockQuerier_GetUserByGoogleSub_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -1578,6 +1796,65 @@ func (_c *MockQuerier_ListParts_Call) Return(_a0 []store.Part, _a1 error) *MockQ
 }
 
 func (_c *MockQuerier_ListParts_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]store.Part, error)) *MockQuerier_ListParts_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// ListPendingInvitesForOrg provides a mock function with given fields: ctx, orgID
+func (_m *MockQuerier) ListPendingInvitesForOrg(ctx context.Context, orgID uuid.UUID) ([]store.Invite, error) {
+	ret := _m.Called(ctx, orgID)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListPendingInvitesForOrg")
+	}
+
+	var r0 []store.Invite
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) ([]store.Invite, error)); ok {
+		return rf(ctx, orgID)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, uuid.UUID) []store.Invite); ok {
+		r0 = rf(ctx, orgID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]store.Invite)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, uuid.UUID) error); ok {
+		r1 = rf(ctx, orgID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// MockQuerier_ListPendingInvitesForOrg_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'ListPendingInvitesForOrg'
+type MockQuerier_ListPendingInvitesForOrg_Call struct {
+	*mock.Call
+}
+
+// ListPendingInvitesForOrg is a helper method to define mock.On call
+//   - ctx context.Context
+//   - orgID uuid.UUID
+func (_e *MockQuerier_Expecter) ListPendingInvitesForOrg(ctx interface{}, orgID interface{}) *MockQuerier_ListPendingInvitesForOrg_Call {
+	return &MockQuerier_ListPendingInvitesForOrg_Call{Call: _e.mock.On("ListPendingInvitesForOrg", ctx, orgID)}
+}
+
+func (_c *MockQuerier_ListPendingInvitesForOrg_Call) Run(run func(ctx context.Context, orgID uuid.UUID)) *MockQuerier_ListPendingInvitesForOrg_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(uuid.UUID))
+	})
+	return _c
+}
+
+func (_c *MockQuerier_ListPendingInvitesForOrg_Call) Return(_a0 []store.Invite, _a1 error) *MockQuerier_ListPendingInvitesForOrg_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *MockQuerier_ListPendingInvitesForOrg_Call) RunAndReturn(run func(context.Context, uuid.UUID) ([]store.Invite, error)) *MockQuerier_ListPendingInvitesForOrg_Call {
 	_c.Call.Return(run)
 	return _c
 }

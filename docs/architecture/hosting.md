@@ -128,7 +128,7 @@ These connect to the Go API over HTTPS — no platform egress cost since they ar
 
 | Service | Provider | Purpose |
 |---|---|---|
-| Auth | Clerk | JWT issuance, user management |
+| Auth (identity) | Google OAuth 2.0 | ID-token issuance; mechatracker owns the user/org/invite tables in its own Postgres |
 | Telemetry (API) | Sentry or Datadog | Error tracking, metrics |
 | Telemetry (web) | Sentry | Frontend error tracking |
 | Telemetry (mobile) | Sentry | Mobile crash reporting |
