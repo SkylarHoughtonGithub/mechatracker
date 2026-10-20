@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { UserButton } from '@clerk/nextjs'
+import { UserMenu } from './user-menu'
 
 export function AppHeader() {
   return (
@@ -13,7 +13,7 @@ export function AppHeader() {
         >
           mechatracker
         </Link>
-        <UserButton />
+        <UserMenu />
       </div>
     </header>
   )

@@ -198,7 +198,8 @@ tasks:
         docker buildx build \
           --platform linux/arm64 \
           --file web/Dockerfile \
-          --build-arg NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY} \
+          --build-arg NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID} \
+          --build-arg BACKEND_URL=${BACKEND_URL:-http://mechatracker-api:8080} \
           --tag {{.WEB_IMAGE_PUSH}}:latest \
           --push \
           .
