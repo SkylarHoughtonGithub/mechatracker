@@ -236,9 +236,9 @@ func (ns NullSourceType) Value() (driver.Value, error) {
 type UserRole string
 
 const (
-	UserRoleOwner      UserRole = "owner"
-	UserRoleManager    UserRole = "manager"
-	UserRoleTechnician UserRole = "technician"
+	UserRoleOwner  UserRole = "owner"
+	UserRoleAdmin  UserRole = "admin"
+	UserRoleMember UserRole = "member"
 )
 
 func (e *UserRole) Scan(src interface{}) error {
@@ -285,6 +285,18 @@ type DeletedItem struct {
 	Snapshot   []byte             `json:"snapshot"`
 	PurgeAt    pgtype.Timestamptz `json:"purge_at"`
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Invite struct {
+	ID         uuid.UUID          `json:"id"`
+	OrgID      uuid.UUID          `json:"org_id"`
+	Email      string             `json:"email"`
+	Role       UserRole           `json:"role"`
+	Token      string             `json:"token"`
+	InvitedBy  uuid.UUID          `json:"invited_by"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	ConsumedAt pgtype.Timestamptz `json:"consumed_at"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
 }
 
 type Organization struct {
@@ -404,13 +416,15 @@ type Resource struct {
 }
 
 type User struct {
-	ID        uuid.UUID          `json:"id"`
-	ClerkID   string             `json:"clerk_id"`
-	OrgID     uuid.UUID          `json:"org_id"`
-	Role      UserRole           `json:"role"`
-	Email     string             `json:"email"`
-	Name      string             `json:"name"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID            uuid.UUID          `json:"id"`
+	GoogleSub     string             `json:"google_sub"`
+	OrgID         uuid.UUID          `json:"org_id"`
+	Role          UserRole           `json:"role"`
+	Email         string             `json:"email"`
+	EmailVerified bool               `json:"email_verified"`
+	Name          string             `json:"name"`
+	PictureUrl    *string            `json:"picture_url"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type Vehicle struct {

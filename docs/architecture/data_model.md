@@ -9,8 +9,9 @@ parent: Architecture
 | Decision | Choice | Rationale |
 |---|---|---|
 | Primary keys | UUID everywhere | Auth-provider-agnostic, safe to expose in URLs |
-| Auth ID | `clerk_id` stored as a plain column on `users` | Internal UUIDs own all FK relationships — Clerk is swappable |
-| Orgs always required | Solo users get a personal org on signup | Uniform data model — no branching logic for solo vs team |
+| Auth ID | `google_sub` stored as a plain column on `users` | Internal UUIDs own all FK relationships — identity provider is swappable |
+| Orgs always required | Users create their own org on first sign-in, or accept an invite into an existing one | Uniform data model — no branching logic for solo vs team |
+| One user, one org | `users.org_id` is NOT NULL and never changes after creation | Simpler schema, matches single-tenant intent per Google account. Cross-org work requires a second Google account. |
 | Assigned technician | Nullable `assigned_to` on repairs | Solo users self-assign, managers assign to techs |
 | Org ID on repairs | Denormalized directly on `repairs` | Fast permission scoping without joins |
 | Deletes | Hard delete everywhere | Confirmation dialog on client — no soft-delete complexity in queries |
@@ -26,7 +27,9 @@ parent: Architecture
 
 ```sql
 CREATE TYPE org_plan       AS ENUM ('personal', 'shop', 'fleet');
-CREATE TYPE user_role      AS ENUM ('owner', 'manager', 'technician');
+CREATE TYPE user_role      AS ENUM ('owner', 'admin', 'member');
+-- The UI can present these as "Owner / Manager / Technician" in a shop context —
+-- the enum stays generic so the model isn't locked to one domain vocabulary.
 CREATE TYPE repair_status  AS ENUM ('draft', 'in_progress', 'pending_parts', 'completed');
 CREATE TYPE part_status    AS ENUM ('needed', 'ordered', 'in_stock', 'installed');
 CREATE TYPE source_type    AS ENUM ('youtube', 'forum', 'pdf', 'parts', 'manual', 'other');
@@ -52,17 +55,41 @@ CREATE TABLE organizations (
 ### users
 ```sql
 CREATE TABLE users (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  clerk_id    TEXT NOT NULL UNIQUE,             -- Clerk user ID, lookup only
-  org_id      UUID NOT NULL REFERENCES organizations(id),
-  role        user_role NOT NULL DEFAULT 'owner',
-  email       TEXT NOT NULL,
-  name        TEXT NOT NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  google_sub      TEXT NOT NULL UNIQUE,             -- Google ID-token subject, lookup only
+  org_id          UUID NOT NULL REFERENCES organizations(id),
+  role            user_role NOT NULL DEFAULT 'owner',
+  email           TEXT NOT NULL,
+  email_verified  BOOLEAN NOT NULL DEFAULT false,
+  name            TEXT NOT NULL,
+  picture_url     TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_users_clerk_id ON users(clerk_id);
-CREATE INDEX idx_users_org_id   ON users(org_id);
+CREATE INDEX idx_users_google_sub ON users(google_sub);
+CREATE INDEX idx_users_org_id     ON users(org_id);
+```
+
+### invites
+```sql
+-- Single-use, 24h expiry. Rejects acceptance if the Google account already has a
+-- users row (single-org-per-user). Email on the invite must match the Google
+-- account's verified email at accept time.
+
+CREATE TABLE invites (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id       UUID NOT NULL REFERENCES organizations(id),
+  email        TEXT NOT NULL,
+  role         user_role NOT NULL,
+  token        TEXT NOT NULL UNIQUE,              -- opaque random, sent in the link
+  invited_by   UUID NOT NULL REFERENCES users(id),
+  expires_at   TIMESTAMPTZ NOT NULL,              -- created_at + 24h
+  consumed_at  TIMESTAMPTZ,                       -- NULL = not yet accepted
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_invites_org_id ON invites(org_id);
+CREATE INDEX idx_invites_token  ON invites(token);
 ```
 
 ### vehicles
@@ -293,15 +320,28 @@ ORDER BY
 
 ## Signup flow
 
-When Clerk fires a new user webhook, the Go API runs this in a single transaction:
+Signup is user-initiated, not webhook-driven. The Go API verifies a Google ID token and runs one of two transactions depending on how the user arrived.
+
+**Path A — new org (`POST /orgs` after Google sign-in):**
 
 ```
-1. INSERT into organizations (personal = true, plan = 'personal')
-2. INSERT into users (org_id = new org, role = 'owner')
-3. INSERT into repair_templates for each global template... (skip — merged at read time)
+1. INSERT into organizations (personal = <true if plan='personal'>, plan = <chosen>)
+2. INSERT into users (google_sub, org_id = new org, role = 'owner')
 ```
 
-No template copying needed. Global templates are always available via the merge query above.
+**Path B — invite accept (`POST /invites/{token}/accept` after Google sign-in):**
+
+```
+1. SELECT invites WHERE token = $1
+     AND consumed_at IS NULL
+     AND expires_at > now()
+     AND email = $2 (verified Google email)
+   -- also reject if a users row already exists for the signed-in google_sub
+2. INSERT into users (google_sub, org_id = invite.org_id, role = invite.role)
+3. UPDATE invites SET consumed_at = now() WHERE id = invite.id
+```
+
+Both paths run as a single transaction. No template copying needed in either — global templates are always available via the merge query above.
 
 ---
 
@@ -309,7 +349,8 @@ No template copying needed. Global templates are always available via the merge 
 
 ```
 organizations
-  └── users (many)
+  └── users (many, one org per user)
+  └── invites (many, pending onboarding)
   └── vehicles (many)
   └── repairs (many, denormalized org_id)
       └── repair_steps (many, ordered by position)

@@ -1411,44 +1411,6 @@ const docTemplate = `{
                     }
                 }
             }
-        },
-        "/webhooks/clerk": {
-            "post": {
-                "description": "Receives and verifies Clerk webhook events. Handles user.created to provision org + user.",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "webhooks"
-                ],
-                "summary": "Clerk webhook receiver",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/github_com_mechatracker_api_internal_apierr.ErrorResponse"
-                        }
-                    }
-                }
-            }
         }
     },
     "definitions": {
@@ -2282,10 +2244,15 @@ const docTemplate = `{
     },
     "securityDefinitions": {
         "BearerAuth": {
-            "description": "Type \"Bearer\" followed by a space and the Clerk JWT.",
+            "description": "Type \"Bearer\" followed by a space and a Google OAuth ID token. Browser clients should rely on the session cookie minted by POST /auth/google instead.",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
+        },
+        "CookieAuth": {
+            "type": "apiKey",
+            "name": "mt_session",
+            "in": "cookie"
         }
     }
 }`

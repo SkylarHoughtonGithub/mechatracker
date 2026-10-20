@@ -160,35 +160,40 @@ All errors use the `apierr` package. Every error response has the same JSON shap
 
 ## Auth and context
 
-The `Auth` middleware in `internal/middleware/auth.go` verifies the Clerk JWT and sets three context keys:
+The `Auth` middleware in `internal/middleware/auth.go` validates one of two credentials, in order:
+
+1. A session cookie — HS256 JWT signed with `SESSION_SIGNING_KEY`, carrying `google_sub` and the internal `user_id` + `org_id` claims.
+2. An `Authorization: Bearer <id-token>` header — a Google ID token, verified against Google's JWKS via `google.golang.org/api/idtoken`. Used by `POST /auth/google` to establish a session; most endpoints only accept the cookie.
+
+On success the middleware runs a `GetUserByGoogleSub` lookup, loads the internal `users` row, and sets three context keys:
 
 | Key | Value |
 |---|---|
-| `KeyUserID` | Clerk subject string (`user_2abc...`) in production; `DevUserID` UUID in dev bypass |
-| `KeyOrgID` | Clerk org ID string in production; `DevOrgID` UUID in dev bypass |
-| `KeyOrgRole` | `"org:admin"` \| `"org:member"` etc. |
+| `KeyUserID` | Internal UUID from `users.id` |
+| `KeyOrgID`  | Internal UUID from `users.org_id` |
+| `KeyRole`   | `"owner"` \| `"admin"` \| `"member"` |
 
 ### Reading context in handlers
 
-**`orgIDFromCtx`** — parses `KeyOrgID` as a UUID. Aborts with 401 if missing or malformed. Every handler that queries the DB calls this first — it is the org-scoping guard.
+**`orgIDFromCtx`** — reads `KeyOrgID`. Aborts with 401 if missing. Every handler that queries the DB calls this first — it is the org-scoping guard.
 
-**`callerIDFromCtx`** — reads `KeyUserID` and parses it as a UUID. Works today because dev bypass sets `KeyUserID` to `DevUserID` (a real UUID). **This will break when real Clerk auth is wired in** — the Clerk subject string is not a UUID. The fix is a user-lookup middleware that calls `GetUserByClerkID`, stores the internal UUID under a new key (e.g. `KeyInternalUserID`), and has `callerIDFromCtx` read that key instead.
+**`callerIDFromCtx`** — reads `KeyUserID` (internal UUID). No Google-sub parsing in handlers; the middleware is the one place where the Google subject is translated to the internal user ID.
+
+### Onboarding routes
+
+A handful of routes run without a `users` row (fresh Google sign-in before create-or-join): `POST /auth/google`, `GET /auth/me`, `POST /orgs`, `POST /invites/{token}/accept`. These accept a session cookie whose `user_id` claim is empty; the middleware allows them through and leaves `KeyUserID` / `KeyOrgID` unset. Any other handler reaching this state returns 401.
 
 ### Dev bypass
 
-When `CLERK_DEV_BYPASS=true`, the middleware skips JWT verification and injects:
+When `DEV_AUTH_BYPASS=true` and `ENV=development`, the middleware skips Google verification and injects:
 
 ```go
 c.Set(KeyUserID, DevUserID)   // "00000000-0000-0000-0000-000000000002"
 c.Set(KeyOrgID,  DevOrgID)    // "00000000-0000-0000-0000-000000000003"
-c.Set(KeyOrgRole, "org:admin")
+c.Set(KeyRole,   "owner")
 ```
 
-These match the dev seed records in `migrations/000002_dev_seeds.up.sql`. See `local_dev.md` for details.
-
-### Clerk JWT verification status
-
-The JWKS fetch and RSA key parsing in `auth.go` are partially implemented. The cache and HTTP fetch work correctly. The `rsaPEMFromJWK` function — which converts a raw JWK `n`/`e` to an RSA public key — is a stub that panics. It needs to be replaced with `github.com/lestrrat-go/jwx/v2/jwk` before real Clerk auth can be used.
+These match the dev seed records in `migrations/000002_dev_seeds.up.sql`. See `local_dev.md` for details. The config validator rejects `DEV_AUTH_BYPASS=true` outside `development`.
 
 ---
 

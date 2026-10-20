@@ -1,122 +1,167 @@
 package middleware
 
 import (
-	"context"
-	"fmt"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/lestrrat-go/jwx/v2/jwk"
 	"go.uber.org/zap"
+	"google.golang.org/api/idtoken"
 
 	"github.com/mechatracker/api/internal/apierr"
 	"github.com/mechatracker/api/internal/config"
+	"github.com/mechatracker/api/internal/session"
 )
 
 // Context keys — use these to read values downstream in handlers.
 const (
-	KeyInternalUserID = "internal_user_id" // Clerk user ID, e.g. "user_2abc..."
-	KeyUserID         = "user_id"          // Clerk user ID, e.g. "user_2abc..."
-	KeyOrgID          = "org_id"           // Clerk org ID, e.g. "org_2abc..." (may be empty)
-	KeyOrgRole        = "org_role"         // "org:admin" | "org:member" etc.
-	KeyRequestID      = "request_id"       // set by RequestID middleware
+	KeyGoogleSub           = "google_sub"
+	KeyGoogleEmail         = "google_email"
+	KeyGoogleEmailVerified = "google_email_verified"
+	KeyGoogleName          = "google_name"
+	KeyGooglePicture       = "google_picture"
+
+	// Set after RequireUser (or after Auth when a signed-in session carries
+	// post-onboarding claims). Empty for pre-onboarding sessions.
+	KeyUserID = "user_id"
+	KeyOrgID  = "org_id"
+	KeyRole   = "role"
+
+	KeyRequestID = "request_id"
 )
 
-// clerkClaims maps the JWT claims issued by Clerk.
-type clerkClaims struct {
-	jwt.RegisteredClaims
-	// Active org context — present when user has selected an org in the
-	// Clerk session. Handlers should treat missing org as "personal" context.
-	OrgID   string `json:"org_id"`
-	OrgRole string `json:"org_role"`
-	OrgSlug string `json:"org_slug"`
-}
-
-// Auth returns a Gin middleware that verifies the Bearer JWT issued by Clerk.
+// Auth validates one of two credentials, in order:
 //
-// On success it sets KeyUserID, KeyOrgID, KeyOrgRole in the Gin context.
-// On failure it aborts with 401 using the apierr envelope.
+//  1. The session cookie (minted by POST /auth/google and carrying Google
+//     claims + optionally the internal user_id + org_id + role).
+//  2. An `Authorization: Bearer <id-token>` header, verified against Google's
+//     JWKS. Used by POST /auth/google itself and by non-browser clients.
 //
-// Dev bypass: when cfg.ClerkDevBypass is true (ENV=development +
-// CLERK_DEV_BYPASS=true) JWT verification is skipped entirely and a synthetic
-// user is injected. This lets the API run locally without a Clerk account.
+// On success it sets the Google-identity context keys. If the credential also
+// carries user_id/org_id/role (post-onboarding session), those are set too.
+// This middleware does NOT require a users row; chain RequireUser after it
+// for routes that need one.
 //
-// JWKS are fetched from cfg.ClerkJWKSURL on first use and cached for 1 hour
-// so we don't hammer Clerk on every request.
+// Dev bypass: when cfg.DevAuthBypass is true (ENV=development only) credential
+// verification is skipped and the dev seed user is injected directly.
 func Auth(cfg *config.Config, log *zap.Logger) gin.HandlerFunc {
 	const (
-		DevUserID = "00000000-0000-0000-0000-000000000002"
-		DevOrgID  = "00000000-0000-0000-0000-000000000003"
+		DevUserID     = "00000000-0000-0000-0000-000000000002"
+		DevOrgID      = "00000000-0000-0000-0000-000000000003"
+		DevGoogleSub  = "dev_google_sub_local"
+		DevEmail      = "dev@mechatracker.local"
+		DevName       = "Dev User"
 	)
 
-	if cfg.ClerkDevBypass {
-		log.Warn("⚠️  Clerk auth is BYPASSED — dev mode only. Never set CLERK_DEV_BYPASS in staging/prod.")
+	if cfg.DevAuthBypass {
+		log.Warn("⚠️  Auth is BYPASSED — dev mode only. Never set DEV_AUTH_BYPASS in staging/prod.")
 		return func(c *gin.Context) {
+			c.Set(KeyGoogleSub, DevGoogleSub)
+			c.Set(KeyGoogleEmail, DevEmail)
+			c.Set(KeyGoogleEmailVerified, true)
+			c.Set(KeyGoogleName, DevName)
 			c.Set(KeyUserID, DevUserID)
 			c.Set(KeyOrgID, DevOrgID)
-			c.Set(KeyOrgRole, "org:admin")
+			c.Set(KeyRole, "owner")
 			c.Next()
 		}
 	}
 
-	cache := &jwksCache{url: cfg.ClerkJWKSURL, log: log}
+	signingKey := []byte(cfg.SessionSigningKey)
 
 	return func(c *gin.Context) {
-		rawToken := extractBearer(c.GetHeader("Authorization"))
-		if rawToken == "" {
-			apierr.Unauthorized(c, "Missing or malformed Authorization header.")
-			return
-		}
-
-		keyFunc := func(token *jwt.Token) (any, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodRSA); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		// 1. Session cookie
+		if raw, err := c.Cookie(session.CookieName); err == nil && raw != "" {
+			claims, perr := session.Parse(signingKey, raw)
+			if perr != nil {
+				log.Debug("session parse failed", zap.Error(perr))
+				apierr.Unauthorized(c, "Invalid or expired session.")
+				return
 			}
-			kid, _ := token.Header["kid"].(string)
-			return cache.getKey(kid)
-		}
-
-		opts := []jwt.ParserOption{
-			jwt.WithExpirationRequired(),
-		}
-		if cfg.ClerkAudience != "" {
-			opts = append(opts, jwt.WithAudience(cfg.ClerkAudience))
-		}
-
-		token, err := jwt.ParseWithClaims(rawToken, &clerkClaims{}, keyFunc, opts...)
-
-		if err != nil || !token.Valid {
-			log.Debug("JWT validation failed", zap.Error(err))
-			apierr.Unauthorized(c, "Invalid or expired token.")
+			setFromSession(c, claims)
+			c.Next()
 			return
 		}
 
-		claims, ok := token.Claims.(*clerkClaims)
-		if !ok {
-			apierr.Unauthorized(c, "Malformed token claims.")
+		// 2. Bearer Google ID token
+		if raw := extractBearer(c.GetHeader("Authorization")); raw != "" {
+			payload, verr := idtoken.Validate(c.Request.Context(), raw, cfg.GoogleClientID)
+			if verr != nil {
+				log.Debug("google id-token validation failed", zap.Error(verr))
+				apierr.Unauthorized(c, "Invalid or expired token.")
+				return
+			}
+			if cfg.GoogleAllowedHD != "" {
+				if hd, _ := payload.Claims["hd"].(string); hd != cfg.GoogleAllowedHD {
+					apierr.Forbidden(c, "This Google account is not permitted.")
+					return
+				}
+			}
+			setFromGooglePayload(c, payload.Subject, payload.Claims)
+			c.Next()
 			return
 		}
 
-		c.Set(KeyUserID, claims.Subject)
-		c.Set(KeyOrgID, claims.OrgID)
-		c.Set(KeyOrgRole, claims.OrgRole)
-
-		c.Next()
+		apierr.Unauthorized(c, "Missing session cookie or Authorization header.")
 	}
 }
 
-// RequireOrg is an additional middleware (applied after Auth) that aborts
-// with 403 if the request does not carry an active Clerk org context.
-// Use on routes that require an org (shop/fleet operations).
+// setFromSession copies session claims onto the gin context.
+func setFromSession(c *gin.Context, claims *session.Claims) {
+	c.Set(KeyGoogleSub, claims.Subject)
+	c.Set(KeyGoogleEmail, claims.Email)
+	c.Set(KeyGoogleEmailVerified, claims.EmailVerified)
+	c.Set(KeyGoogleName, claims.Name)
+	c.Set(KeyGooglePicture, claims.PictureURL)
+	if claims.UserID != "" {
+		c.Set(KeyUserID, claims.UserID)
+		c.Set(KeyOrgID, claims.OrgID)
+		c.Set(KeyRole, claims.Role)
+	}
+}
+
+// setFromGooglePayload copies a verified Google ID-token payload onto the
+// gin context. Used when a non-browser client hits an endpoint directly with
+// Bearer auth instead of going through POST /auth/google first.
+func setFromGooglePayload(c *gin.Context, sub string, claims map[string]any) {
+	c.Set(KeyGoogleSub, sub)
+	if email, _ := claims["email"].(string); email != "" {
+		c.Set(KeyGoogleEmail, email)
+	}
+	if verified, _ := claims["email_verified"].(bool); verified {
+		c.Set(KeyGoogleEmailVerified, verified)
+	}
+	if name, _ := claims["name"].(string); name != "" {
+		c.Set(KeyGoogleName, name)
+	}
+	if picture, _ := claims["picture"].(string); picture != "" {
+		c.Set(KeyGooglePicture, picture)
+	}
+}
+
+// RequireOrg aborts with 403 if the request does not carry an active org
+// (i.e. the user has signed in but not onboarded). Use on routes that must
+// run inside an org.
 func RequireOrg(c *gin.Context) {
 	if c.GetString(KeyOrgID) == "" {
 		apierr.Forbidden(c, "This endpoint requires an active organization context.")
 		return
 	}
 	c.Next()
+}
+
+// RequireRole aborts with 403 unless the caller holds one of the given roles.
+// Must run after Auth + RequireUser.
+func RequireRole(roles ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		have := c.GetString(KeyRole)
+		for _, r := range roles {
+			if have == r {
+				c.Next()
+				return
+			}
+		}
+		apierr.Forbidden(c, "This endpoint requires one of: "+strings.Join(roles, ", "))
+	}
 }
 
 // extractBearer pulls the token from "Bearer <token>" or returns "".
@@ -126,73 +171,4 @@ func extractBearer(header string) string {
 		return ""
 	}
 	return strings.TrimSpace(parts[1])
-}
-
-// ── JWKS cache ────────────────────────────────────────────────────────────────
-
-type jwksCache struct {
-	url  string
-	log  *zap.Logger
-	mu   sync.RWMutex
-	keys map[string]any // kid → rsa.PublicKey
-	exp  time.Time
-}
-
-func (c *jwksCache) getKey(kid string) (any, error) {
-	c.mu.RLock()
-	if time.Now().Before(c.exp) {
-		if key, ok := c.keys[kid]; ok {
-			c.mu.RUnlock()
-			return key, nil
-		}
-	}
-	c.mu.RUnlock()
-
-	// Refresh
-	if err := c.refresh(); err != nil {
-		return nil, fmt.Errorf("jwks: refresh failed: %w", err)
-	}
-
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	key, ok := c.keys[kid]
-	if !ok {
-		return nil, fmt.Errorf("jwks: unknown kid %q", kid)
-	}
-	return key, nil
-}
-
-func (c *jwksCache) refresh() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	set, err := jwk.Fetch(ctx, c.url)
-	if err != nil {
-		return fmt.Errorf("jwks: fetch failed: %w", err)
-	}
-
-	keys := make(map[string]any, set.Len())
-	for i := 0; i < set.Len(); i++ {
-		key, ok := set.Key(i)
-		if !ok {
-			continue
-		}
-		var raw any
-		if err := key.Raw(&raw); err != nil {
-			c.log.Warn("jwks: failed to extract raw key",
-				zap.String("kid", key.KeyID()),
-				zap.Error(err),
-			)
-			continue
-		}
-		keys[key.KeyID()] = raw
-	}
-
-	c.mu.Lock()
-	c.keys = keys
-	c.exp = time.Now().Add(time.Hour)
-	c.mu.Unlock()
-
-	c.log.Info("jwks: refreshed", zap.Int("keys", len(keys)))
-	return nil
 }

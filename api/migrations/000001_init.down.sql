@@ -12,6 +12,7 @@ DROP TABLE IF EXISTS repair_steps     CASCADE;
 DROP TABLE IF EXISTS repairs          CASCADE;
 DROP TABLE IF EXISTS repair_templates CASCADE;
 DROP TABLE IF EXISTS vehicles         CASCADE;
+DROP TABLE IF EXISTS invites          CASCADE;
 DROP TABLE IF EXISTS users            CASCADE;
 DROP TABLE IF EXISTS organizations    CASCADE;
 

@@ -9,7 +9,6 @@ vars:
   API_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/api
   WEB_IMAGE_PUSH: localhost:{{.REGISTRY_PORT}}/mechatracker/web
   WEB_IMAGE_PULL: mechatracker-registry:{{.REGISTRY_PORT}}/mechatracker/web
-  WEBHOOK_DOMAIN: unify-skating-trivial.ngrok-free.dev
 
 tasks:
   default:
@@ -31,7 +30,7 @@ tasks:
   setup:tools:
     desc: "Install all dev dependencies via Homebrew and go install"
     cmds:
-      - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx libpq ngrok
+      - brew install go node k3d kubectl helm sqlc golang-migrate docker-buildx libpq
       - go install github.com/vektra/mockery/v2@latest
       - go install github.com/swaggo/swag/cmd/swag@latest
       - npm install -g swagger2openapi openapi-typescript
@@ -121,11 +120,10 @@ tasks:
       - kubectl get pods -n {{.K8S_NAMESPACE}}
 
   dev:tunnels:
-    desc: "Start all port-forwards and ngrok tunnel for local webhook testing"
+    desc: "Start API + web port-forwards in parallel"
     deps:
       - task: dev:pf:api
       - task: dev:pf:web
-      - task: webhook:tunnel
 
   dev:pf:api:
     internal: true
@@ -308,15 +306,6 @@ tasks:
     cmds:
       - kubectl port-forward -n {{.K8S_NAMESPACE}} svc/mechatracker-postgresql 5432:5432
 
-  db:seed:user:
-    desc: "Upsert dev user clerk_id (run after any DB wipe)"
-    dotenv: ['api/.env']
-    cmds:
-      - |
-        psql "$DATABASE_URL" -c "
-          UPDATE users
-          SET clerk_id = '$CLERK_DEV_USER_ID'
-          WHERE id = '00000000-0000-0000-0000-000000000002';"
   # ── Code generation ──────────────────────────────────────────────────────────
 
   generate:
@@ -365,29 +354,3 @@ tasks:
     dir: infra/terraform
     cmds: [terraform apply]
 
-# ── Webhooks ─────────────────────────────────────────────────────────────────
-
-  webhook:tunnel:
-    desc: "Start ngrok tunnel for Clerk webhooks (run in a separate terminal alongside task dev)"
-    cmds:
-      - ngrok http --domain={{.WEBHOOK_DOMAIN}} 8080
-
-  webhook:test:
-    desc: "Send a fake user.created payload to the local webhook endpoint (no signature check needed in dev since CLERK_DEV_BYPASS handles auth)"
-    cmds:
-      - |
-        curl -s -X POST http://localhost:8080/webhooks/clerk \
-          -H "Content-Type: application/json" \
-          -H "svix-id: test-$(date +%s)" \
-          -H "svix-timestamp: $(date +%s)" \
-          -H "svix-signature: v1,fakesignature" \
-          -d '{
-            "type": "user.created",
-            "data": {
-              "id": "user_test_local_$(date +%s)",
-              "email_addresses": [{"id": "ea_test", "email_address": "test@example.com"}],
-              "first_name": "Test",
-              "last_name": "User",
-              "username": null
-            }
-          }' | jq

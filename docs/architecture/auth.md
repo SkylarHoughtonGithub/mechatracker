@@ -4,6 +4,60 @@ title: Auth Architecture
 parent: Architecture
 ---
 
+## Current decision — Google OAuth + owned user model
+
+**Status:** Decided — reverted from Clerk (Oct 2026).
+
+mechatracker handles identity through Google's OAuth 2.0 ID-token flow and owns the user/org/invite data model in its own Postgres. Clerk was removed because its hosted org-management surface added operational cost (ngrok tunnel for webhook delivery, dashboard webhook config, dev vs prod signing-secret rotation) without buying anything the app couldn't do itself at this scale.
+
+### Shape
+
+| Concern | Implementation |
+|---|---|
+| Identity | Google OAuth 2.0, server-side ID-token verification via `google.golang.org/api/idtoken` |
+| Session | Signed JWT (HS256) in an httpOnly, SameSite=Lax cookie; 12h TTL; `SESSION_SIGNING_KEY` from env |
+| User model | `users` table with `google_sub` (unique), `org_id` (NOT NULL), `role` (`owner`/`admin`/`member`) |
+| Tenancy | Single-org-per-user. Multi-tenancy is preserved (orgs are isolated); cross-org work requires a second Google account. |
+| Onboarding | First Google sign-in with no `users` row → "create org or paste invite" screen |
+| Invites | `invites` table, 24h expiry, single-use, email-matched against the invitee's verified Google email |
+| Webhooks | None. Google doesn't push; the API only ever pulls (JWKS verification). |
+| Local dev | `DEV_AUTH_BYPASS=true` short-circuits token verification and injects the dev seed user; rejected outside `ENV=development` |
+
+### Why single-org-per-user
+
+Clerk's multi-org model implied one user could belong to many orgs with different roles in each — convenient, but it drove a lot of UI (org switcher), middleware (which org is this request against?), and data (`memberships` join table) that the app didn't actually benefit from. In mechatracker's domain, a technician works at a shop; if they move to a different shop they get a new account. Keeping `org_id` on `users` as NOT NULL preserves the simpler shape and matches the existing schema.
+
+### Why Google (and not Gitea OIDC, which the rest of Skylab uses)
+
+mechatracker is a public-facing SaaS target, not a platform internal tool. Users signing up with their personal Gmail is the lowest-friction path. The Skylab control-plane tools (Backstage, Argo CD, Grafana) stay on Gitea OIDC — different audience, different IdP.
+
+### Routes
+
+| Route | Purpose |
+|---|---|
+| `POST /auth/google` | Verify Google ID token, mint session cookie. If `users` row exists, return it; otherwise return onboarding claims. |
+| `POST /auth/logout` | Clear session cookie. |
+| `GET /auth/me` | Return current user + org, or `needs_onboarding: true` with Google claims. |
+| `POST /orgs` | Create a new org + `users` row with role=owner for the current Google claims. |
+| `POST /orgs/invites` | Owner/admin creates an invite (24h, single-use). |
+| `POST /invites/{token}/accept` | Create a `users` row scoped to the invite's org (if the Google account has no existing row). |
+
+### Config
+
+- `GOOGLE_CLIENT_ID` — required; also used as the ID-token audience.
+- `GOOGLE_ALLOWED_HD` — optional, restricts to a Google Workspace hosted domain.
+- `SESSION_SIGNING_KEY` — required, 32+ bytes.
+- `SESSION_COOKIE_DOMAIN`, `SESSION_COOKIE_SECURE` (default true), `SESSION_TTL` (default 12h).
+- `DEV_AUTH_BYPASS` — only honored when `ENV=development`.
+
+**Revisit if:** auth becomes a feature (SSO for enterprise shops, SAML, SCIM provisioning). At that point WorkOS or a reintroduction of a hosted provider is the right conversation — not a Clerk-shaped product, but one chosen deliberately for the enterprise need.
+
+---
+
+## Historical: provider comparison (Oct 2025 — pre-revert)
+
+The sections below were the original provider-comparison exercise that led to picking Clerk. They are preserved as context for why Clerk was chosen initially and why it didn't stick — see "Current decision" above for the live design.
+
 ## Auth Requirements
 
 | Requirement | Notes |
@@ -222,14 +276,18 @@ The organizations/teams feature is the deciding factor for mechaTracker. The sho
 
 ---
 
-## Decision
+## Decision (historical)
 
-**Status:** Decided Clerk
+**Status:** Reverted (Oct 2026). See "Current decision — Google OAuth + owned user model" at the top of this doc.
 
- dev bypass is implemented with CLERK_DEV_BYPASS=true but JWK verification (rsaPEMFromJWK) is still stubbed out and needs lestrrat-go/jwx/v2.
+**Original decision:** Clerk, chosen for its Organizations API, prebuilt React components, and official React Native SDK.
 
-**Rationale:** Organizations API covers the shop/fleet model without custom build. Best React/Next.js developer experience. Official React Native SDK. Go backend uses standard JWT verification — no vendor dependency on the API layer. Kinde is worth a closer look given its slightly larger free tier and built-in billing module.
+**Why it was reverted:**
+- Clerk never got past the dev-bypass stage. Full JWT verification (`rsaPEMFromJWK`) remained stubbed; wiring it would have meant pulling in `lestrrat-go/jwx/v2` and still owning the Clerk SDK upgrade path.
+- Webhook delivery required ngrok (Clerk → public URL → port-forward → pod), which introduced per-dev config, free-tier subdomain churn, and signing-secret rotation steps.
+- The multi-org model that was Clerk's main selling point was more flexibility than the shop/fleet domain actually needed. See "Why single-org-per-user" above.
+- Removing a managed-service dependency simplifies the operational story for a hobby/portfolio project — no vendor dashboard to manage, no per-env webhook URLs, no MAU ceiling to track.
 
-**Revisit if:** MAU grows past ~5k paying users and auth costs become a meaningful line item. Migration is painful but Clerk provides full data export and documented migration paths.
+**What was kept:** the "own user IDs in your own Postgres" discipline from the original decision — the only auth-related schema change was `clerk_id` → `google_sub`.
 
-**Key risk to track:** Vendor pricing changes. Document all user IDs in your own Postgres from day one so the data layer is auth-provider-agnostic regardless of which you choose.
+**Revisit (reconsider a hosted provider) if:** SSO/SAML, SCIM, or audit-log compliance becomes a product requirement. The honest trigger is "we are selling into enterprise fleets," not "auth code is annoying to maintain."

@@ -14,7 +14,9 @@ CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 -- ============================================================
 
 CREATE TYPE org_plan      AS ENUM ('personal', 'shop', 'fleet');
-CREATE TYPE user_role     AS ENUM ('owner', 'manager', 'technician');
+CREATE TYPE user_role     AS ENUM ('owner', 'admin', 'member');
+-- The UI can present these as "Owner / Manager / Technician" in a shop context;
+-- the enum stays generic so the model isn't locked to one vocabulary.
 CREATE TYPE repair_status AS ENUM ('draft', 'in_progress', 'pending_parts', 'completed');
 CREATE TYPE part_status   AS ENUM ('needed', 'ordered', 'in_stock', 'installed');
 CREATE TYPE source_type   AS ENUM ('youtube', 'forum', 'pdf', 'parts', 'manual', 'other');
@@ -37,22 +39,47 @@ CREATE TABLE organizations (
 
 -- ============================================================
 -- USERS
--- auth_id = Clerk user ID. Used only for JWT lookup.
--- All internal FK relationships use our UUID id.
+-- google_sub = Google OAuth ID-token subject. Used only for identity lookup.
+-- All internal FK relationships use our UUID id, so the identity provider
+-- stays swappable.
 -- ============================================================
 
 CREATE TABLE users (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    clerk_id   TEXT NOT NULL UNIQUE,
-    org_id     UUID NOT NULL REFERENCES organizations(id),
-    role       user_role NOT NULL DEFAULT 'owner',
-    email      TEXT NOT NULL,
-    name       TEXT NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    google_sub     TEXT NOT NULL UNIQUE,
+    org_id         UUID NOT NULL REFERENCES organizations(id),
+    role           user_role NOT NULL DEFAULT 'owner',
+    email          TEXT NOT NULL,
+    email_verified BOOLEAN NOT NULL DEFAULT false,
+    name           TEXT NOT NULL,
+    picture_url    TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_users_clerk_id ON users(clerk_id);
-CREATE INDEX idx_users_org_id   ON users(org_id);
+CREATE INDEX idx_users_google_sub ON users(google_sub);
+CREATE INDEX idx_users_org_id     ON users(org_id);
+
+-- ============================================================
+-- INVITES
+-- Single-use, 24h expiry. An invite accepted by a Google account that
+-- already has a users row is rejected (single-org-per-user). The invite's
+-- email must match the Google account's verified email at accept time.
+-- ============================================================
+
+CREATE TABLE invites (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    org_id      UUID NOT NULL REFERENCES organizations(id),
+    email       TEXT NOT NULL,
+    role        user_role NOT NULL,
+    token       TEXT NOT NULL UNIQUE,
+    invited_by  UUID NOT NULL REFERENCES users(id),
+    expires_at  TIMESTAMPTZ NOT NULL,
+    consumed_at TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_invites_org_id ON invites(org_id);
+CREATE INDEX idx_invites_token  ON invites(token);
 
 -- ============================================================
 -- VEHICLES

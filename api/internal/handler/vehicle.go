@@ -310,19 +310,10 @@ func orgIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
 	return id, true
 }
 
-// callerIDFromCtx reads the internal users.id from context.
-//
-// In dev bypass mode, KeyUserID is set to DevUserID (a real UUID) so this
-// parses cleanly. When real Clerk auth is wired in, KeyUserID will be the
-// Clerk subject string ("user_2abc...") which is not a UUID — at that point
-// add a user-lookup middleware that queries GetUserByClerkID and stores the
-// internal UUID under a separate key (e.g. KeyInternalUserID), then read
-// that key here instead.
+// callerIDFromCtx reads the internal users.id from context. RequireUser (or
+// Auth with a post-onboarding session) must have run first.
 func callerIDFromCtx(c *gin.Context) (uuid.UUID, bool) {
-	raw := c.GetString(middleware.KeyInternalUserID)
-	if raw == "" {
-		raw = c.GetString(middleware.KeyUserID)
-	}
+	raw := c.GetString(middleware.KeyUserID)
 	if raw == "" {
 		apierr.Unauthorized(c, "No user context.")
 		return uuid.UUID{}, false
