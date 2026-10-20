@@ -5,8 +5,15 @@
 # Run: docker buildx build -f web/Dockerfile .
 FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 
-ARG NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
-ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY
+# NEXT_PUBLIC_GOOGLE_CLIENT_ID is baked into the client bundle at build time
+# (Google Identity Services JS reads it). BACKEND_URL is server-side only —
+# Next.js's /api/backend/* rewrite forwards there at request time; it is not
+# bundled into the client. Both are safe defaults for local dev; CI overrides
+# per-environment.
+ARG NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
+ARG BACKEND_URL=http://localhost:8080
+ENV BACKEND_URL=$BACKEND_URL
 
 WORKDIR /app
 

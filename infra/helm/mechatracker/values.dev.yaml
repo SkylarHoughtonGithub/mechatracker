@@ -12,10 +12,11 @@ api:
     ENV: development
     PORT: "8080"
     DATABASE_URL: "postgres://mechatracker:mechatracker@mechatracker-postgresql:5432/mechatracker?sslmode=disable"
-    CLERK_DEV_BYPASS: "false"
-    CLERK_JWKS_URL: "https://daring-drake-86.clerk.accounts.dev/.well-known/jwks.json"
-    CLERK_AUDIENCE: ""
-    CLERK_WEBHOOK_SECRET: ""
+    DEV_AUTH_BYPASS: "true"
+    GOOGLE_CLIENT_ID: ""
+    SESSION_SIGNING_KEY: ""
+    SESSION_COOKIE_SECURE: "false"
+    SESSION_TTL: "12h"
     SPACES_ENDPOINT: ""
     SPACES_BUCKET: ""
     SPACES_ACCESS_KEY: ""
@@ -54,10 +55,15 @@ web:
     pullPolicy: Always
 
   env:
-    # Points at the API via the in-cluster service name.
-    # In-cluster requests go service-to-service — no ingress hop needed.
-    NEXT_PUBLIC_API_URL: "http://localhost:8080"
-    INTERNAL_API_URL: "http://mechatracker-api:8080"
+    # BACKEND_URL is server-side only; Next.js's /api/backend/* rewrite
+    # forwards there, keeping the browser same-origin so the mt_session
+    # cookie flows without SameSite=None/Secure gymnastics.
+    BACKEND_URL: "http://mechatracker-api:8080"
+    # Google OAuth client ID is baked into the client bundle at build time
+    # (NEXT_PUBLIC_*). Dev doesn't need a real one when API runs with
+    # DEV_AUTH_BYPASS=true — the sign-in page just won't produce a working
+    # Google credential until this is filled.
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: ""
 
   service:
     type: ClusterIP
