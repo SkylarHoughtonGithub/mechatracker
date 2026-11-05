@@ -343,15 +343,3 @@ tasks:
       - k3d cluster delete {{.CLUSTER_NAME}}
       - k3d registry delete k3d-{{.REGISTRY_NAME}} || true
 
-  # ── Infrastructure ───────────────────────────────────────────────────────────
-
-  infra:plan:
-    desc: "Preview Terraform changes"
-    dir: infra/terraform
-    cmds: [terraform plan]
-
-  infra:apply:
-    desc: "Apply Terraform changes"
-    dir: infra/terraform
-    cmds: [terraform apply]
-

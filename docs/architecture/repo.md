@@ -47,15 +47,14 @@ mechaTracker/
 │   └── package.json            # Workspace package — imported by web + mobile
 │
 ├── infra/
-│   ├── terraform/
-│   │   ├── modules/            # Reusable: droplet, db, spaces, firewall, registry
-│   │   └── envs/
-│   │       ├── prod/
-│   │       └── staging/
-│   └── scripts/
-│       ├── deploy.sh
-│       ├── migrate.sh
-│       └── rollback.sh
+│   ├── helm/                   # Local-dev Helm chart (k3d only)
+│   │   └── mechatracker/
+│   ├── k3d/                    # k3d cluster + registry config
+│   └── buildkit/               # buildx / BuildKit config
+│
+# Production deployment lives in skylab-gitops:
+#   workloads/mechatracker/       — KubeVela Application
+#   workloads/mechatracker-db/    — Crossplane-managed Postgres
 │
 ├── .github/
 │   └── workflows/

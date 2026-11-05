@@ -718,7 +718,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Returns a presigned URL for direct-to-Spaces photo upload. Not yet implemented — wire DigitalOcean Spaces config first.",
+                "description": "Returns a presigned URL for direct-to-bucket photo upload. Not yet implemented — wire object storage config first.",
                 "produces": [
                     "application/json"
                 ],

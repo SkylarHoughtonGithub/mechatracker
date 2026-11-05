@@ -1,22 +1,23 @@
-# values.yaml — production-oriented defaults.
-# All secrets come from external secret management (e.g. DO Secrets, K8s Secrets).
-# Override with values.dev.yaml locally, values.staging.yaml in CI, etc.
+# values.yaml — chart defaults for local-dev k3d.
+# Production deployment uses the KubeVela Application in skylab-gitops
+# (workloads/mechatracker/) — not this chart. All secrets come from
+# External Secrets Operator or plain K8s Secrets.
 
 api:
   replicaCount: 2
   image:
-    repository: registry.digitalocean.com/mechatracker/api
+    repository: ghcr.io/skylarhoughtongithub/mechatracker-api
     tag: ""         # set by CI at deploy time
     pullPolicy: IfNotPresent
 
-  env: {}           # populated via K8s Secret in production
+  env: {}           # populated via K8s Secret
 
   service:
     type: ClusterIP
     port: 8080
 
   ingress:
-    enabled: false  # enabled in prod values; managed by Terraform/CI
+    enabled: false
 
   resources:
     requests:
@@ -30,18 +31,18 @@ web:
   enabled: true
   replicaCount: 2
   image:
-    repository: registry.digitalocean.com/mechatracker/web
+    repository: ghcr.io/skylarhoughtongithub/mechatracker-web
     tag: ""         # set by CI at deploy time
     pullPolicy: IfNotPresent
 
-  env: {}           # populated via K8s Secret in production
+  env: {}           # populated via K8s Secret
 
   service:
     type: ClusterIP
     port: 3000
 
   ingress:
-    enabled: false  # enabled in prod values; managed by Terraform/CI
+    enabled: false
 
   resources:
     requests:
@@ -52,4 +53,4 @@ web:
       memory: 512Mi
 
 postgresql:
-  enabled: false    # prod uses DigitalOcean Managed PostgreSQL
+  enabled: false    # prod uses a Crossplane-managed Postgres (Postgres XRD → RDS or CloudSQL)

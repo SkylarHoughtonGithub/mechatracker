@@ -27,7 +27,6 @@ Object storage should work for all application needs
 | AWS S3 | $0.023/GB | $0.09/GB | 5 GB (12mo) | Native | Hosting on AWS |
 | Google Cloud Storage | $0.020/GB | $0.08/GB | 5 GB (12mo) | Yes | Hosting on GCP |
 | Linode Object Storage | $0.020/GB | 1 TB free | 250 GB incl. | Yes | Hosting on Linode |
-| DigitalOcean Spaces | $25/mo flat | 1 TB incl. | None | Yes | Hosting on DO |
 | Supabase Storage | $0.021/GB | $0.09/GB | 1 GB | Yes | All-in on Supabase |
 | Azure Blob | $0.018/GB | $0.087/GB | 5 GB (12mo) | No | Skip |
 | MinIO (self-hosted) | Infra only | Free | Unlimited | Yes | Skip early on |
@@ -102,18 +101,6 @@ Object storage should work for all application needs
 
 ---
 
-### DigitalOcean Spaces
-**Pros**
-- 1 TB egress included in flat $25/mo
-- Built-in CDN
-- Natural fit if hosting API on DigitalOcean
-
-**Cons**
-- Flat fee regardless of usage — poor value at low volume early on
-- No free tier to start
-
----
-
 ### Supabase Storage
 **Pros**
 - Bundles auth + database + storage into one platform
@@ -152,12 +139,14 @@ Object storage should work for all application needs
 
 Egress is the cost that matters. Storage is cheap everywhere — the difference between providers is pennies per GB. Egress is where AWS, GCP, and Azure charge $0.08–0.09/GB, and for a photo-heavy app where repair profiles load multiple images on every open, that adds up fast.
 
-**R2 or Linode/DO (if hosting there) are the strongest choices.** All S3-compatible options use identical Go code — swapping providers is just a config change.
+All S3-compatible options use identical Go code — swapping providers is just a config change.
 
 ---
 
 ## Decision
 
-**Status:** Pending hosting choice
+**Crossplane `Bucket` XRD, resolved to S3 on AWS or GCS on GCP by composition** (see [`skylab-crossplane`](https://github.com/SkylarHoughtonGithub/skylab-crossplane), XRD v0.1.0).
 
-Hosting and storage are best decided together — same-provider storage often means free internal egress, which changes the math. Once hosting is decided, this decision follows naturally.
+mechatracker's manifest declares the storage dependency via the Skylab `bucket` ComponentDefinition; which cloud fulfills it is a composition decision on the target cluster (`spec.cloud: aws | gcp`). The `writeConnectionSecretToRef` output is picked up by the Go API as `envFrom` for S3-compatible SDK config.
+
+Trade-off accepted: egress on the chosen cloud is paid in exchange for cloud-agnostic application manifests and no static credentials — IAM comes from Roles Anywhere (AWS) or Workload Identity Federation (GCP), both rooted at the Skylab step-ca trust anchor. See [`hosting.md`](hosting.md) for the deployment context.
