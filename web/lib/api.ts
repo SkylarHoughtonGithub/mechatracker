@@ -117,10 +117,9 @@ export const onboarding = {
 
 // ── Tenant API ───────────────────────────────────────────────────────────────
 //
-// Previously these were wrapped in `useApi()` because they needed to pull a
-// Clerk JWT from the `useAuth()` hook. The session cookie is set by the
-// browser automatically, so these can be plain module-level functions now.
-// Existing callers that invoke `useApi()` still work via the shim at bottom.
+// Plain module-level functions because auth travels in the mt_session cookie,
+// which the browser attaches automatically. Existing callers that invoke
+// `useApi()` still work via the shim at the bottom of this file.
 
 export const api = {
   garage: {
@@ -224,8 +223,7 @@ export const api = {
 }
 
 // Shim for existing call sites that still read `useApi()` as a hook.
-// Preserves the same return shape as the previous Clerk-based version, but
-// without the Clerk hook dependency — session cookie carries auth now.
+// Session cookie carries auth, so this is a trivial pass-through.
 export function useApi() {
   return api
 }
