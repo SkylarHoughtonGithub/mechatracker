@@ -164,7 +164,7 @@ This runs in parallel:
 
 Browse to `http://localhost:3000`. With `DEV_AUTH_BYPASS=true` (default in `values.dev.yaml`) you are automatically signed in as the dev user. With real Google OAuth configured (see "Signing in with real Google" above) the sign-in button mints a session cookie against your Google account.
 
-There is no tunnel step — removing Clerk removed the only reason a public URL was needed in dev. The API's only outbound call for auth is Google's JWKS endpoint, which doesn't need inbound connectivity.
+There is no tunnel step — the API's only outbound call for auth is Google's JWKS endpoint, which doesn't need inbound connectivity.
 
 ---
 

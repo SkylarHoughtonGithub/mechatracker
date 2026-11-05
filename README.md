@@ -32,7 +32,7 @@ A repair tracking platform for mechanics, auto shops, and fleet managers. Search
 | Database | PostgreSQL |
 | DB query layer | sqlc (generated, type-safe) |
 | Migrations | golang-migrate |
-| Auth | Clerk (JWT verified in Go middleware) |
+| Auth | Google OAuth 2.0 (ID-token verification in Go middleware; HS256 session JWT in `mt_session` cookie) |
 
 ### Infrastructure
 | Layer | Technology |
@@ -119,7 +119,7 @@ Infrastructure and architecture decisions are documented in [`docs/decisions/`](
 
 | Decision | Status | Doc |
 |---|---|---|
-| Auth provider | Clerk | [auth.md](docs/architecture/auth.md) |
+| Auth provider | Google OAuth 2.0 | [auth.md](docs/architecture/auth.md) |
 | File storage | Crossplane `Bucket` XRD (S3 or GCS) | [storage.md](docs/architecture/storage.md) |
 | Hosting | Skylab platform (KubeVela + Crossplane) | [hosting.md](docs/architecture/hosting.md) |
 | Repo structure | Monorepo — Go + Next.js + Expo | [repo.md](docs/architecture/repo.md) |

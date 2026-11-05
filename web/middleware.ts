@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Replaces the old Clerk-based proxy.ts. Only checks for the mt_session
-// cookie's presence — not its validity. That's the backend's job; a stale
-// cookie will 401 the API call and the AuthProvider will route the user
-// back to /sign-in from the response.
+// Checks for the mt_session cookie's presence — not its validity. That's
+// the backend's job; a stale cookie will 401 the API call and the
+// AuthProvider will route the user back to /sign-in from the response.
 //
 // Public routes are the sign-in page, invite accept, and anything under
 // /api/backend/* (which the Next.js rewrite forwards to the API and must

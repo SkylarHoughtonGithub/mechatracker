@@ -1157,42 +1157,13 @@ paths:
               schema:
                 $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
                   sponse"
-  /webhooks/clerk:
-    post:
-      description: Receives and verifies Clerk webhook events. Handles user.created to
-        provision org + user.
-      tags:
-        - webhooks
-      summary: Clerk webhook receiver
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: object
-                additionalProperties:
-                  type: string
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
-                  sponse"
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/github_com_mechatracker_api_internal_apierr.ErrorRe\
-                  sponse"
 servers:
   - url: //localhost:8080/v1
 components:
   securitySchemes:
     BearerAuth:
-      description: Type "Bearer" followed by a space and the Clerk JWT.
+      description: Type "Bearer" followed by a space and a Google OAuth ID token. Browser
+        clients should rely on the session cookie minted by POST /auth/google instead.
       type: apiKey
       name: Authorization
       in: header
