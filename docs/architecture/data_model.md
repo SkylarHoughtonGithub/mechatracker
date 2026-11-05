@@ -216,7 +216,7 @@ CREATE TABLE photos (
   repair_id    UUID NOT NULL REFERENCES repairs(id),
   step_id      UUID REFERENCES repair_steps(id),   -- nullable — repair-level or step-level
   user_id      UUID NOT NULL REFERENCES users(id),
-  storage_key  TEXT NOT NULL,                       -- DO Spaces object key
+  storage_key  TEXT NOT NULL,                       -- object storage key
   caption      TEXT,
   size_bytes   INT,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT now()

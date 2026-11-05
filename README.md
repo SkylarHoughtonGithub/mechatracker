@@ -37,11 +37,11 @@ A repair tracking platform for mechanics, auto shops, and fleet managers. Search
 ### Infrastructure
 | Layer | Technology |
 |---|---|
-| Compute | DigitalOcean Droplets (Docker) |
-| Database | DigitalOcean Managed PostgreSQL |
-| File storage | DigitalOcean Spaces (S3-compatible) |
-| Container registry | DigitalOcean Container Registry (DOCR) |
-| IaC | Terraform (DigitalOcean provider) |
+| Compute | [Skylab](https://github.com/SkylarHoughtonGithub/skylab-gitops) platform — KubeVela Application in `workloads/mechatracker/` |
+| Database | Crossplane-managed Postgres via [skylab-crossplane](https://github.com/SkylarHoughtonGithub/skylab-crossplane) `Postgres` XRD (RDS or CloudSQL, composition-selected) |
+| File storage | Crossplane-managed bucket via `Bucket` XRD (S3 or GCS, composition-selected) |
+| Container registry | GitHub Container Registry (GHCR) |
+| Cloud foundations | [skylab-terraform](https://github.com/SkylarHoughtonGithub/skylab-terraform) (OIDC, Roles Anywhere, buckets, trust anchors) |
 | CI/CD | GitHub Actions |
 | Mobile builds | Expo EAS Build + EAS Submit |
 
@@ -109,7 +109,6 @@ task dev                              # start full local stack
 task generate                         # regenerate all generated files
 task api:test                         # run Go tests
 task db:new NAME=add_something        # create a new migration and scaffolds sqlc migration files
-task infra:plan                       # preview infrastructure changes
 ```
 
 ---
@@ -120,8 +119,8 @@ Infrastructure and architecture decisions are documented in [`docs/decisions/`](
 
 | Decision | Status | Doc |
 |---|---|---|
-| Auth provider | Clerk | [auth.md](docs/decisions/auth.md) |
-| File storage | DigitalOcean Spaces | [storage.md](docs/decisions/storage.md) |
-| Hosting | DigitalOcean Droplets + Docker | [hosting.md](docs/decisions/hosting.md) |
-| Repo structure | Monorepo — Go + Next.js + Expo | [repo.md](docs/decisions/repo.md) |
-| Data model | PostgreSQL schema | [datamodel.md](docs/decisions/datamodel.md) |
+| Auth provider | Clerk | [auth.md](docs/architecture/auth.md) |
+| File storage | Crossplane `Bucket` XRD (S3 or GCS) | [storage.md](docs/architecture/storage.md) |
+| Hosting | Skylab platform (KubeVela + Crossplane) | [hosting.md](docs/architecture/hosting.md) |
+| Repo structure | Monorepo — Go + Next.js + Expo | [repo.md](docs/architecture/repo.md) |
+| Data model | PostgreSQL schema | [data_model.md](docs/architecture/data_model.md) |

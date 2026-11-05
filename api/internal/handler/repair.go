@@ -846,7 +846,7 @@ func (h *RepairHandler) CreateNote(c *gin.Context) {
 
 // UploadPhoto godoc
 // @Summary      Get a photo upload URL
-// @Description  Returns a presigned URL for direct-to-Spaces photo upload. Not yet implemented — wire DigitalOcean Spaces config first.
+// @Description  Returns a presigned URL for direct-to-bucket photo upload. Not yet implemented — wire object storage config first.
 // @Tags         repairs
 // @Produce      json
 // @Param        repairID  path      string  true  "Repair UUID"  format(uuid)
@@ -876,7 +876,7 @@ func (h *RepairHandler) UploadPhoto(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusNotImplemented, gin.H{
-		"message": "Photo upload not yet implemented — wire up DigitalOcean Spaces in Phase 2.",
+		"message": "Photo upload not yet implemented — wire object storage in Phase 2.",
 	})
 }
 

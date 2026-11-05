@@ -58,11 +58,11 @@ Run `task generate` after any change to `queries/*.sql` or `migrations/*.up.sql`
 
 | Component | Local | Production |
 |---|---|---|
-| Kubernetes | k3d (k3s in Docker) | DigitalOcean Droplets |
-| Container registry | Local k3d registry | DigitalOcean Container Registry |
-| Database | Official `postgres:17` StatefulSet | DigitalOcean Managed PostgreSQL |
+| Kubernetes | k3d (k3s in Docker) | EKS or GKE, provisioned by [skylab-crossplane](https://github.com/SkylarHoughtonGithub/skylab-crossplane) `KubernetesCluster` XRD |
+| Container registry | Local k3d registry | GitHub Container Registry (GHCR) |
+| Database | Official `postgres:17` StatefulSet | Crossplane-managed Postgres (`Postgres` XRD → RDS or CloudSQL) |
 | Auth | Dev bypass (`DEV_AUTH_BYPASS=true`) | Google ID-token verification + session cookie |
-| File storage | Not running | DigitalOcean Spaces |
+| File storage | Not running | Crossplane-managed bucket (`Bucket` XRD → S3 or GCS) |
 
 ---
 
@@ -91,13 +91,13 @@ Multi-platform builds (`linux/amd64,linux/arm64`) are unstable locally on Apple 
 
 The full multi-platform build happens in CI on amd64 runners, where arm64 cross-compilation is handled natively by Go (`GOARCH=arm64`) without QEMU. See the Dockerfile — `--platform=$BUILDPLATFORM` on the builder stage pins the Go compiler to the host architecture; `GOOS`/`GOARCH` args handle cross-compilation for the output binary.
 
-Production images pushed to DOCR are multi-arch manifest lists covering both platforms.
+Production images pushed to GHCR are multi-arch manifest lists covering both platforms.
 
 ### Bitnami PostgreSQL
 
 The Bitnami Helm chart for PostgreSQL was the original dependency. In August 2025, Broadcom (which acquired Bitnami) removed all free images from `docker.io/bitnami`. The chart was replaced with a plain Kubernetes StatefulSet using the official `postgres:17` image from Docker Hub, which is maintained by the PostgreSQL project and has no licensing concerns.
 
-The production database is DigitalOcean Managed PostgreSQL and does not use this StatefulSet at all — `postgresql.enabled` defaults to `false` in `values.yaml`.
+The production database is Crossplane-managed (via the `Postgres` XRD) and does not use this StatefulSet at all — `postgresql.enabled` defaults to `false` in `values.yaml`.
 
 ### Migrations in local dev
 
